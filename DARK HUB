@@ -415,18 +415,18 @@ task.spawn(function()
 end)
 
 --//==================================================
---// AUTO COLLECT TAB (WITH MUTATION SUPPORT)
+--// AUTO COLLECT TAB
 --//==================================================
 
 local autoCollectEnabled = false
 local autoCollectAllEnabled = false
-local onlyMutationsEnabled = false
-local isLoopRunning = false
-
 local selectedFruits = {}
-local selectedMutations = {}
 local collectionRadius = 100
 local collectCooldown = 0.2
+
+local CollectRemote = ReplicatedStorage:FindFirstChild("GameEvents") 
+    and ReplicatedStorage.GameEvents:FindFirstChild("Crops") 
+    and ReplicatedStorage.GameEvents.Crops:FindFirstChild("Collect")
 
 local ALL_COLLECTIBLES = {
     "Apple", "Coconut", "Banana", "Mango", "Dragon Fruit", "Sugar Apple", "Alien Apple", "Elder Strawberry",
@@ -436,186 +436,87 @@ local ALL_COLLECTIBLES = {
     "Mushroom", "Cacao", "Giant Pinecone", "Zebrazinkle"
 }
 
-local MUTATIONS_LIST = {
-    "Shiny", "Gold", "Rainbow", "Giant", "Mega", "Gilded", 
-    "Void", "Frozen", "Neon", "Toxic", "Divine", "Cursed"
-}
-
 local function getHRP()
     local char = player.Character
     return char and char:FindFirstChild("HumanoidRootPart")
 end
 
 local function collectItem(obj)
-    local gameEvents = ReplicatedStorage:FindFirstChild("GameEvents")
-    local cropsFolder = gameEvents and gameEvents:FindFirstChild("Crops")
-    local collectRemote = cropsFolder and cropsFolder:FindFirstChild("Collect")
-    
-    if not collectRemote then 
-        warn("[ERROR] Collect Remote not found in ReplicatedStorage.GameEvents.Crops.Collect!")
-        return false 
-    end
-    
-    print("[COLLECTING] Firing Remote for:", obj:GetFullName())
+    if not CollectRemote then return false end
     return pcall(function()
-        collectRemote:FireServer({ obj })
+        CollectRemote:FireServer({ obj })
     end)
-end
-
--- Helper to check if an object or string contains mutation attributes/names/labels
-local function getObjectMutation(obj)
-    -- 1. Check object attributes
-    for _, attrName in ipairs({"Mutation", "Variant", "Tier", "Type", "IsMutated"}) do
-        local val = obj:GetAttribute(attrName)
-        if val then 
-            print("[DEBUG] Mutation found via Attribute (" .. attrName .. "):", val, "on Object:", obj:GetFullName())
-            return tostring(val) 
-        end
-    end
-
-    -- 2. Check Object Name for mutation keywords
-    local objNameLower = obj.Name:lower()
-    for _, mut in ipairs(MUTATIONS_LIST) do
-        if objNameLower:find(mut:lower(), 1, true) then
-            print("[DEBUG] Mutation found via Name:", mut, "on Object:", obj.Name)
-            return mut
-        end
-    end
-
-    -- 3. Check for BillboardGuis or TextLabels attached to the crop
-    for _, child in ipairs(obj:GetDescendants()) do
-        if child:IsA("TextLabel") or child:IsA("TextButton") then
-            local textLower = child.Text:lower()
-            for _, mut in ipairs(MUTATIONS_LIST) do
-                if textLower:find(mut:lower(), 1, true) then
-                    print("[DEBUG] Mutation found via TextLabel (" .. child.Text .. "):", mut, "on Object:", obj.Name)
-                    return mut
-                end
-            end
-        end
-    end
-
-    return nil
 end
 
 local function getHarvestableItems()
     local items = {}
     local hrp = getHRP()
-    if not hrp then return items end
-
-    local hrpPos = hrp.Position
-
-    local function checkAndInsert(obj)
-        local nameLower = obj.Name:lower()
-        
+    
+    local function processInstance(obj)
         for _, name in ipairs(ALL_COLLECTIBLES) do
-            if nameLower:find(name:lower(), 1, true) then
+            if obj.Name:lower():find(name:lower(), 1, true) then
                 local pos = nil
                 if obj:IsA("BasePart") then
                     pos = obj.Position
-                elseif obj:IsA("Model") then
-                    pos = obj.PrimaryPart and obj.PrimaryPart.Position or obj:GetPivot().Position
+                elseif obj:IsA("Model") and obj.PrimaryPart then
+                    pos = obj.PrimaryPart.Position
                 end
 
-                if pos then
-                    local dist = (pos - hrpPos).Magnitude
-                    if dist <= collectionRadius then
-                        local detectedMutation = getObjectMutation(obj)
+                local dist = (pos and hrp) and (pos - hrp.Position).Magnitude or 0
 
-                        print(string.format("[SCANNER] Found Crop: %s | Object Name: %s | Mutation: %s | Distance: %.1f studs", 
-                            name, obj.Name, detectedMutation or "None", dist))
-
-                        table.insert(items, {
-                            Object = obj,
-                            Name = name,
-                            Mutation = detectedMutation,
-                            Distance = dist
-                        })
-                    end
-                end
+                table.insert(items, {
+                    Object = obj,
+                    Name = name,
+                    Distance = dist
+                })
                 break
             end
         end
     end
 
-    -- Scan Workspace recursively up to 3 levels deep
-    for _, obj in ipairs(Workspace:GetChildren()) do
-        checkAndInsert(obj)
-        if obj:IsA("Folder") or obj:IsA("Model") then
-            for _, child in ipairs(obj:GetChildren()) do
-                checkAndInsert(child)
-                if child:IsA("Folder") or child:IsA("Model") then
-                    for _, subChild in ipairs(child:GetChildren()) do
-                        checkAndInsert(subChild)
-                    end
-                end
-            end
-        end
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        processInstance(obj)
     end
 
-    table.sort(items, function(a, b)
-        return a.Distance < b.Distance
-    end)
+    if getnilinstances then
+        for _, obj in ipairs(getnilinstances()) do
+            processInstance(obj)
+        end
+    end
 
     return items
 end
 
 local function startCollectionLoop()
-    if isLoopRunning then return end
-    isLoopRunning = true
-
     task.spawn(function()
         while autoCollectEnabled do
             local items = getHarvestableItems()
             
             for _, item in ipairs(items) do
                 if not autoCollectEnabled then break end
+                if item.Distance > collectionRadius then continue end
 
-                -- Check Mutation-Only Filter
-                if onlyMutationsEnabled and not item.Mutation then
-                    continue
-                end
-
-                -- Check Specific Mutation Selection
-                if #selectedMutations > 0 then
-                    if not item.Mutation then continue end
-                    local mutMatch = false
-                    for _, mut in ipairs(selectedMutations) do
-                        if item.Mutation:lower() == mut:lower() then
-                            mutMatch = true
-                            break
-                        end
-                    end
-                    if not mutMatch then continue end
-                end
-
-                -- Check Specific Crop Selection
                 if not autoCollectAllEnabled then
-                    local cropMatch = false
+                    local selected = false
                     for _, name in ipairs(selectedFruits) do
                         if item.Name:lower() == name:lower() then
-                            cropMatch = true
+                            selected = true
                             break
                         end
                     end
-                    if not cropMatch then continue end
+                    if not selected then continue end
                 end
 
                 collectItem(item.Object)
                 task.wait(collectCooldown)
             end
             
-            task.wait(0.3)
+            task.wait(0.5)
         end
-        isLoopRunning = false
     end)
 end
 
---//==================================================
---// UI CONTROLS
---//==================================================
-
-AutomaticallyTab:CreateSection("Collect Plant & Mutations")
+AutomaticallyTab:CreateSection("Collect Plant")
 
 AutomaticallyTab:CreateToggle({
     Name = "Auto Collect ALL Crops",
@@ -627,27 +528,7 @@ AutomaticallyTab:CreateToggle({
     end,
 })
 
-AutomaticallyTab:CreateToggle({
-    Name = "✨ Collect ONLY Mutated Crops",
-    CurrentValue = false,
-    Callback = function(Value)
-        onlyMutationsEnabled = Value
-    end,
-})
-
-AutomaticallyTab:CreateSection("Mutation Filters")
-
-AutomaticallyTab:CreateDropdown({
-    Name = "Select Specific Mutations",
-    Options = MUTATIONS_LIST,
-    CurrentOption = {},
-    MultipleOptions = true,
-    Callback = function(Options)
-        selectedMutations = Options
-    end,
-})
-
-AutomaticallyTab:CreateSection("Specific Plant Selection")
+AutomaticallyTab:CreateSection("Specific Selection")
 
 local CropDropdown
 
@@ -712,16 +593,15 @@ CropDropdown = AutomaticallyTab:CreateDropdown({
 })
 
 AutomaticallyTab:CreateButton({
-    Name = "❌ Clear Selected Filters",
+    Name = "❌ Clear Selected Plants Filter",
     Callback = function()
         selectedFruits = {}
-        selectedMutations = {}
         if CropDropdown then
             CropDropdown:Set({})
         end
         Rayfield:Notify({
-            Title = "Filters Cleared",
-            Content = "All plant and mutation filters cleared.",
+            Title = "Filter Cleared",
+            Content = "All selected plants removed.",
             Duration = 2,
         })
     end,
@@ -731,10 +611,10 @@ AutomaticallyTab:CreateToggle({
     Name = "Auto Collect Selected Only",
     CurrentValue = false,
     Callback = function(Value)
-        if Value and #selectedFruits == 0 and #selectedMutations == 0 then
+        if Value and #selectedFruits == 0 then
             Rayfield:Notify({
                 Title = "Selection Error",
-                Content = "Please select at least one plant or mutation filter!",
+                Content = "Please search or select at least one plant first!",
                 Duration = 3,
             })
             return
@@ -766,7 +646,7 @@ AutomaticallyTab:CreateSlider({
     Callback = function(Value)
         collectCooldown = Value
     end,
-})
+})                       
 
 --//==================================================
 --// THEMES TAB
