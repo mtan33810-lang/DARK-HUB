@@ -267,53 +267,89 @@ EventsTab:CreateToggle({
 --// SHOP TAB (BEANSTALK EVENT SHOP)
 --//==================================================
 
-ShopTab:CreateSection("Beanstalk Event Shop")
+EventsTab:CreateSection("Beanstalk Event Shop")
 
 local autoBuyEventShop = false
 local buyShopDelay = 1
 local selectedShopItem = "1"
 
+local shopItems = {
+    ["🌱 Sprout Seed Pack"] = "1",
+    ["🥚 Sprout Egg"] = "2",
+    ["🌿 Mandrake Seed"] = "3",
+    ["📦 Sprout Crate"] = "4",
+    ["🧪 Silver Fertilizer"] = "5",
+    ["🍈 Canary Melon Seed"] = "6",
+    ["💗 Amberheart"] = "7",
+    ["🐉 Spriggan"] = "8",
+    ["🖼️ Golden Goose Painting"] = "9",
+    ["🪑 Bean Chair"] = "10",
+    ["🖼️ Giant Painting"] = "11",
+}
+
+local shopItemNames = {}
+
+for itemName in pairs(shopItems) do
+    table.insert(shopItemNames, itemName)
+end
+
+table.sort(shopItemNames)
+
 local function buyEventStock(itemId)
     local gameEvents = ReplicatedStorage:FindFirstChild("GameEvents")
     local buyRemote = gameEvents and gameEvents:FindFirstChild("BuyEventShopStock")
-    
+
     if buyRemote then
-        print("[EVENT SHOP] Firing BuyEventShopStock for Item/Slot ID:", itemId)
+        print("[EVENT SHOP] Buying:", itemId)
         buyRemote:FireServer(itemId)
     else
-        warn("[ERROR] BuyEventShopStock Remote not found in ReplicatedStorage.GameEvents!")
+        warn("[ERROR] BuyEventShopStock Remote not found!")
     end
 end
 
-ShopTab:CreateInput({
-    Name = "🛒 Custom Item ID / Slot Index",
-    PlaceholderText = "Enter ID or Index (e.g. 1, 2, SeedName)",
-    RemoveTextAfterFocusLost = false,
-    Callback = function(Text)
-        if Text ~= "" then
-            selectedShopItem = Text
+EventsTab:CreateDropdown({
+    Name = "🛒 Select Event Shop Item",
+    Options = shopItemNames,
+    CurrentOption = {"🌱 Sprout Seed Pack"},
+    MultipleOptions = false,
+    Flag = "EventShopItem",
+    Callback = function(Option)
+        local selectedName = Option[1]
+
+        if shopItems[selectedName] then
+            selectedShopItem = shopItems[selectedName]
+
+            print(
+                "[EVENT SHOP] Selected:",
+                selectedName,
+                "ID:",
+                selectedShopItem
+            )
         end
     end,
 })
 
-ShopTab:CreateButton({
+EventsTab:CreateButton({
     Name = "🛍️ Buy Selected Item Stock Once",
     Callback = function()
         buyEventStock(selectedShopItem)
+
         Rayfield:Notify({
-            Title = "Shop Purchased",
-            Content = "Attempted purchase for Item ID: " .. tostring(selectedShopItem),
+            Title = "Shop Purchase",
+            Content = "Attempted purchase: " .. tostring(selectedShopItem),
             Duration = 3,
         })
     end,
 })
 
-ShopTab:CreateToggle({
-    Name = "🔄 Auto Buy Event Shop Stock (Loop)",
+EventsTab:CreateToggle({
+    Name = "🔄 Auto Buy Event Shop Stock",
     CurrentValue = false,
     Flag = "AutoBuyEventShopFlag",
+
     Callback = function(Value)
         autoBuyEventShop = Value
+
         if Value then
             task.spawn(function()
                 while autoBuyEventShop do
@@ -325,15 +361,18 @@ ShopTab:CreateToggle({
     end,
 })
 
-ShopTab:CreateSlider({
+EventsTab:CreateSlider({
     Name = "Purchase Loop Delay (Sec)",
     Range = {0.1, 5},
     Increment = 0.1,
     CurrentValue = buyShopDelay,
+    Flag = "EventShopDelay",
+
     Callback = function(Value)
         buyShopDelay = Value
     end,
 })
+
 
 --//==================================================
 --// SHOP TAB
