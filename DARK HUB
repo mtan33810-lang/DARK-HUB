@@ -433,7 +433,7 @@ local ALL_COLLECTIBLES = {
     "Carrot", "Tomato", "Corn", "Pumpkin", "Watermelon", "Bamboo", "Cactus", "Pepper", "Romanesco",
     "Strawberry", "Blueberry", "Grape", "Moongrain Meadow",
     "Buttercup", "Orange Tulip", "Daffodil", "Sunflower", "Burning Bud", "Ember Lily", "Crimson Thorn", "Octobloom",
-    "Mushroom", "Cacao", "Giant Pinecone", "Zebrazinkle"
+    "Mushroom", "Cacao", "Giant Pinecone", "Zebrazinkle" "Carrot",
 }
 
 local MUTATIONS_LIST = {
