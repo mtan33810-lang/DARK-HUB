@@ -109,101 +109,112 @@ MainTab:CreateSlider({
         end
     end,
 })
+--//==================================================
+--// FLY MECHANICS (FIXED)
+--//==================================================
 
--- Fly Mechanics
 local flyEnabled = false
 local flyConnection = nil
-local flyAttachment = nil
 local flyVelocity = nil
-local flyOrientation = nil
+local flyGyro = nil
 local FLY_SPEED = 60
 
 local function cleanupFly()
-    if flyConnection then flyConnection:Disconnect() flyConnection = nil end
-    if flyVelocity then flyVelocity:Destroy() flyVelocity = nil end
-    if flyOrientation then flyOrientation:Destroy() flyOrientation = nil end
-    if flyAttachment then flyAttachment:Destroy() flyAttachment = nil end
+    if flyConnection then 
+        flyConnection:Disconnect() 
+        flyConnection = nil 
+    end
+    if flyVelocity then 
+        flyVelocity:Destroy() 
+        flyVelocity = nil 
+    end
+    if flyGyro then 
+        flyGyro:Destroy() 
+        flyGyro = nil 
+    end
 end
 
 local function stopFly()
     flyEnabled = false
     cleanupFly()
+    
     local character = player.Character
     if character then
         local humanoid = character:FindFirstChildOfClass("Humanoid")
         if humanoid then
-            humanoid.AutoRotate = true
             humanoid.PlatformStand = false
+            humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
         end
     end
 end
 
 local function startFly()
     stopFly()
+    
     local character = player.Character or player.CharacterAdded:Wait()
     local humanoid = character:WaitForChild("Humanoid")
     local root = character:WaitForChild("HumanoidRootPart")
 
     flyEnabled = true
-    humanoid.AutoRotate = false
+    humanoid.PlatformStand = true -- Freezes default humanoid physics
 
-    flyAttachment = Instance.new("Attachment")
-    flyAttachment.Name = "FlyAttachment"
-    flyAttachment.Parent = root
-
-    flyVelocity = Instance.new("LinearVelocity")
+    -- BodyVelocity handles overall linear motion cleanly
+    flyVelocity = Instance.new("BodyVelocity")
     flyVelocity.Name = "FlyVelocity"
-    flyVelocity.Attachment0 = flyAttachment
-    flyVelocity.RelativeTo = Enum.ActuatorRelativeTo.World
-    flyVelocity.VelocityConstraintMode = Enum.VelocityConstraintMode.Vector
-    flyVelocity.VectorVelocity = Vector3.zero
-    flyVelocity.MaxForce = math.huge
+    flyVelocity.MaxForce = Vector3.new(1e9, 1e9, 1e9)
+    flyVelocity.Velocity = Vector3.zero
     flyVelocity.Parent = root
 
-    flyOrientation = Instance.new("AlignOrientation")
-    flyOrientation.Name = "FlyOrientation"
-    flyOrientation.Attachment0 = flyAttachment
-    flyOrientation.Mode = Enum.OrientationAlignmentMode.OneAttachment
-    flyOrientation.Responsiveness = 15
-    flyOrientation.MaxTorque = math.huge
-    flyOrientation.Parent = root
+    -- BodyGyro prevents character tilting or falling over
+    flyGyro = Instance.new("BodyGyro")
+    flyGyro.Name = "FlyGyro"
+    flyGyro.MaxTorque = Vector3.new(1e9, 1e9, 1e9)
+    flyGyro.P = 9e4
+    flyGyro.CFrame = root.CFrame
+    flyGyro.Parent = root
 
     flyConnection = RunService.RenderStepped:Connect(function()
-        if not flyEnabled or not character.Parent or not root.Parent then return end
+        if not flyEnabled or not character.Parent or not root.Parent then 
+            stopFly()
+            return 
+        end
+        
         local camera = workspace.CurrentCamera
         if not camera then return end
 
-        local cameraLook = camera.CFrame.LookVector
-        local cameraRight = camera.CFrame.RightVector
-
-        local forward = Vector3.new(cameraLook.X, 0, cameraLook.Z)
-        local right = Vector3.new(cameraRight.X, 0, cameraRight.Z)
-
-        if forward.Magnitude > 0 then forward = forward.Unit end
-        if right.Magnitude > 0 then right = right.Unit end
-
         local direction = Vector3.zero
+        local cameraCFrame = camera.CFrame
 
-        if UserInputService:IsKeyDown(Enum.KeyCode.W) then direction += forward end
-        if UserInputService:IsKeyDown(Enum.KeyCode.S) then direction -= forward end
-        if UserInputService:IsKeyDown(Enum.KeyCode.D) then direction += right end
-        if UserInputService:IsKeyDown(Enum.KeyCode.A) then direction -= right end
-
-        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then direction += Vector3.yAxis end
-        if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) or UserInputService:IsKeyDown(Enum.KeyCode.RightControl) then
-            direction -= Vector3.yAxis
+        -- Movement relative to camera perspective
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then 
+            direction += cameraCFrame.LookVector 
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then 
+            direction -= cameraCFrame.LookVector 
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then 
+            direction += cameraCFrame.RightVector 
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then 
+            direction -= cameraCFrame.RightVector 
         end
 
+        -- Vertical control
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then 
+            direction += Vector3.yAxis 
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) or UserInputService:IsKeyDown(Enum.KeyCode.RightControl) then 
+            direction -= Vector3.yAxis 
+        end
+
+        -- Update physics targets
         if direction.Magnitude > 0 then
-            direction = direction.Unit
-            flyVelocity.VectorVelocity = direction * FLY_SPEED
+            flyVelocity.Velocity = direction.Unit * FLY_SPEED
         else
-            flyVelocity.VectorVelocity = Vector3.zero
+            flyVelocity.Velocity = Vector3.zero
         end
 
-        if forward.Magnitude > 0 then
-            flyOrientation.CFrame = CFrame.lookAt(root.Position, root.Position + forward)
-        end
+        flyGyro.CFrame = cameraCFrame
     end)
 end
 
@@ -212,7 +223,11 @@ MainTab:CreateToggle({
     CurrentValue = false,
     Flag = "FlyMode",
     Callback = function(Value)
-        if Value then startFly() else stopFly() end
+        if Value then 
+            startFly() 
+        else 
+            stopFly() 
+        end
     end,
 })
 
