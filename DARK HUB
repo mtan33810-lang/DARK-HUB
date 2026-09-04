@@ -7,7 +7,7 @@ local Window = Rayfield:CreateWindow({
    LoadingSubtitle = "by Max",
    ShowText = "Rayfield",
    Theme = "Default",
-   ToggleUIKeybind = "K",
+   ToggleUIKeybind = Enum.KeyCode.K,
    DisableRayfieldPrompts = false,
    DisableBuildWarnings = false,
    ConfigurationSaving = {
@@ -22,6 +22,21 @@ local Window = Rayfield:CreateWindow({
    },
    KeySystem = false
 })
+
+--// Services
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+
+--// Player
+local player = Players.LocalPlayer
+
+--// State Variables
+local InfiniteJump = false
+local currentWalkSpeed = 16
+local currentJumpHeight = 7.2
 
 --//==================================================
 --// TABS
@@ -39,18 +54,21 @@ Rayfield:Notify({
    Duration = 5,
 })
 
---// Services
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Workspace = game:GetService("Workspace")
+--// Helper function to apply character stats
+local function applyStats(character)
+    if not character then return end
+    local humanoid = character:WaitForChild("Humanoid", 5)
+    if humanoid then
+        humanoid.WalkSpeed = currentWalkSpeed
+        humanoid.UseJumpPower = false
+        humanoid.JumpHeight = currentJumpHeight
+    end
+end
 
---// Player
-local player = Players.LocalPlayer
-
---// State Variables
-local InfiniteJump = false
+--// Respawn Handler
+player.CharacterAdded:Connect(function(character)
+    applyStats(character)
+end)
 
 --//==================================================
 --// HOME TAB
@@ -85,6 +103,7 @@ MainTab:CreateSlider({
     CurrentValue = 16,
     Flag = "WalkSpeed",
     Callback = function(Value)
+        currentWalkSpeed = Value
         local character = player.Character
         local humanoid = character and character:FindFirstChildOfClass("Humanoid")
         if humanoid then
@@ -101,6 +120,7 @@ MainTab:CreateSlider({
     CurrentValue = 7.2,
     Flag = "JumpHeight",
     Callback = function(Value)
+        currentJumpHeight = Value
         local character = player.Character
         local humanoid = character and character:FindFirstChildOfClass("Humanoid")
         if humanoid then
@@ -158,13 +178,11 @@ local function startFly()
         local camera = workspace.CurrentCamera
         if not camera then return end
 
-        -- Force platform stand every frame to override ground checks
         humanoid.PlatformStand = true
 
         local direction = Vector3.zero
         local cameraCFrame = camera.CFrame
 
-        -- 3D Movement relative to camera facing direction
         if UserInputService:IsKeyDown(Enum.KeyCode.W) then
             direction += cameraCFrame.LookVector
         end
@@ -178,7 +196,6 @@ local function startFly()
             direction -= cameraCFrame.RightVector
         end
 
-        -- Direct vertical controls
         if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
             direction += Vector3.yAxis
         end
@@ -186,10 +203,8 @@ local function startFly()
             direction -= Vector3.yAxis
         end
 
-        -- Face the camera direction
         root.CFrame = CFrame.lookAt(root.Position, root.Position + cameraCFrame.LookVector)
 
-        -- Apply velocity directly to the character assembly
         if direction.Magnitude > 0 then
             root.AssemblyLinearVelocity = direction.Unit * FLY_SPEED
         else
