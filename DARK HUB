@@ -219,6 +219,36 @@ player.CharacterAdded:Connect(function()
 end)  
 
 --//==================================================
+--// EVENT TAB
+--//==================================================
+
+EventsTab:CreateSection("Beanstalk Event")
+
+EventsTab:CreateToggle({
+    Name = "Auto Submit All Plants (Beanstalk)",
+    CurrentValue = false,
+    Flag = "BeanstalkAutoSubmitFlag",
+    Callback = function(Value)
+        getgenv().AutoSubmitBeanstalk = Value
+        if Value then
+            task.spawn(function()
+                while getgenv().AutoSubmitBeanstalk do
+                    local eventFolder = ReplicatedStorage:FindFirstChild("GameEvents")
+                    local event = eventFolder and eventFolder:FindFirstChild("Events") 
+                        and eventFolder.Events:FindFirstChild("BeanstalkEvent") 
+                        and eventFolder.Events.BeanstalkEvent:FindFirstChild("BeanstalkRESubmitAllPlant")
+                    
+                    if event then
+                        event:FireServer()
+                    end
+                    task.wait(10)
+                end
+            end)
+        end
+    end,
+})
+
+--//==================================================
 --// SHOP TAB
 --//==================================================
 
