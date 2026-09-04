@@ -264,6 +264,78 @@ EventsTab:CreateToggle({
 })
 
 --//==================================================
+--// SHOP TAB (BEANSTALK EVENT SHOP)
+--//==================================================
+
+ShopTab:CreateSection("Beanstalk Event Shop")
+
+local autoBuyEventShop = false
+local buyShopDelay = 1
+local selectedShopItem = "1"
+
+local function buyEventStock(itemId)
+    local gameEvents = ReplicatedStorage:FindFirstChild("GameEvents")
+    local buyRemote = gameEvents and gameEvents:FindFirstChild("BuyEventShopStock")
+    
+    if buyRemote then
+        print("[EVENT SHOP] Firing BuyEventShopStock for Item/Slot ID:", itemId)
+        buyRemote:FireServer(itemId)
+    else
+        warn("[ERROR] BuyEventShopStock Remote not found in ReplicatedStorage.GameEvents!")
+    end
+end
+
+ShopTab:CreateInput({
+    Name = "🛒 Custom Item ID / Slot Index",
+    PlaceholderText = "Enter ID or Index (e.g. 1, 2, SeedName)",
+    RemoveTextAfterFocusLost = false,
+    Callback = function(Text)
+        if Text ~= "" then
+            selectedShopItem = Text
+        end
+    end,
+})
+
+ShopTab:CreateButton({
+    Name = "🛍️ Buy Selected Item Stock Once",
+    Callback = function()
+        buyEventStock(selectedShopItem)
+        Rayfield:Notify({
+            Title = "Shop Purchased",
+            Content = "Attempted purchase for Item ID: " .. tostring(selectedShopItem),
+            Duration = 3,
+        })
+    end,
+})
+
+ShopTab:CreateToggle({
+    Name = "🔄 Auto Buy Event Shop Stock (Loop)",
+    CurrentValue = false,
+    Flag = "AutoBuyEventShopFlag",
+    Callback = function(Value)
+        autoBuyEventShop = Value
+        if Value then
+            task.spawn(function()
+                while autoBuyEventShop do
+                    buyEventStock(selectedShopItem)
+                    task.wait(buyShopDelay)
+                end
+            end)
+        end
+    end,
+})
+
+ShopTab:CreateSlider({
+    Name = "Purchase Loop Delay (Sec)",
+    Range = {0.1, 5},
+    Increment = 0.1,
+    CurrentValue = buyShopDelay,
+    Callback = function(Value)
+        buyShopDelay = Value
+    end,
+})
+
+--//==================================================
 --// SHOP TAB
 --//==================================================
 
