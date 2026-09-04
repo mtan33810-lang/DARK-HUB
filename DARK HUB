@@ -1,0 +1,709 @@
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+   Name = "Dark Hub",
+   Icon = 0,
+   LoadingTitle = "Dark Hub",
+   LoadingSubtitle = "by Max",
+   ShowText = "Rayfield",
+   Theme = "Default",
+   ToggleUIKeybind = "K",
+   DisableRayfieldPrompts = false,
+   DisableBuildWarnings = false,
+   ConfigurationSaving = {
+      Enabled = false,
+      FolderName = nil,
+      FileName = "Big Hub"
+   },
+   Discord = {
+      Enabled = false,
+      Invite = "noinvitelink",
+      RememberJoins = true
+   },
+   KeySystem = false
+})
+
+--//==================================================
+--// TABS
+--//==================================================
+
+local MainTab = Window:CreateTab("Home", 4483362458)
+local EventsTab = Window:CreateTab("Event", 4483362458)
+local ShopTab = Window:CreateTab("Shop", 4483362458)
+local AutomaticallyTab = Window:CreateTab("Auto Collect", 4483362458)
+local ThemeTab = Window:CreateTab("Themes", 4483362458)
+
+Rayfield:Notify({
+   Title = "You executed the script",
+   Content = "Very good GUI",
+   Duration = 5,
+})
+
+--// Services
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+
+--// Player
+local player = Players.LocalPlayer
+
+--// State Variables
+local InfiniteJump = false
+
+--//==================================================
+--// HOME TAB
+--//==================================================
+
+MainTab:CreateSection("Main Controls")
+
+MainTab:CreateToggle({
+    Name = "Infinite Jump",
+    CurrentValue = false,
+    Flag = "InfiniteJump",
+    Callback = function(Value)
+        InfiniteJump = Value
+    end,
+})
+
+UserInputService.JumpRequest:Connect(function()
+    if not InfiniteJump then return end
+    local character = player.Character
+    if not character then return end
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    if humanoid then
+        humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+    end
+end)
+
+MainTab:CreateSlider({
+    Name = "Walkspeed",
+    Range = {0, 300},
+    Increment = 1,
+    Suffix = " Speed",
+    CurrentValue = 16,
+    Flag = "WalkSpeed",
+    Callback = function(Value)
+        local character = player.Character
+        local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+        if humanoid then
+            humanoid.WalkSpeed = Value
+        end
+    end,
+})
+
+MainTab:CreateSlider({
+    Name = "Jump Height",
+    Range = {0, 300},
+    Increment = 1,
+    Suffix = " Height",
+    CurrentValue = 7.2,
+    Flag = "JumpHeight",
+    Callback = function(Value)
+        local character = player.Character
+        local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+        if humanoid then
+            humanoid.UseJumpPower = false
+            humanoid.JumpHeight = Value
+        end
+    end,
+})
+
+-- Fly Mechanics
+local flyEnabled = false
+local flyConnection = nil
+local flyAttachment = nil
+local flyVelocity = nil
+local flyOrientation = nil
+local FLY_SPEED = 60
+
+local function cleanupFly()
+    if flyConnection then flyConnection:Disconnect() flyConnection = nil end
+    if flyVelocity then flyVelocity:Destroy() flyVelocity = nil end
+    if flyOrientation then flyOrientation:Destroy() flyOrientation = nil end
+    if flyAttachment then flyAttachment:Destroy() flyAttachment = nil end
+end
+
+local function stopFly()
+    flyEnabled = false
+    cleanupFly()
+    local character = player.Character
+    if character then
+        local humanoid = character:FindFirstChildOfClass("Humanoid")
+        if humanoid then
+            humanoid.AutoRotate = true
+            humanoid.PlatformStand = false
+        end
+    end
+end
+
+local function startFly()
+    stopFly()
+    local character = player.Character or player.CharacterAdded:Wait()
+    local humanoid = character:WaitForChild("Humanoid")
+    local root = character:WaitForChild("HumanoidRootPart")
+
+    flyEnabled = true
+    humanoid.AutoRotate = false
+
+    flyAttachment = Instance.new("Attachment")
+    flyAttachment.Name = "FlyAttachment"
+    flyAttachment.Parent = root
+
+    flyVelocity = Instance.new("LinearVelocity")
+    flyVelocity.Name = "FlyVelocity"
+    flyVelocity.Attachment0 = flyAttachment
+    flyVelocity.RelativeTo = Enum.ActuatorRelativeTo.World
+    flyVelocity.VelocityConstraintMode = Enum.VelocityConstraintMode.Vector
+    flyVelocity.VectorVelocity = Vector3.zero
+    flyVelocity.MaxForce = math.huge
+    flyVelocity.Parent = root
+
+    flyOrientation = Instance.new("AlignOrientation")
+    flyOrientation.Name = "FlyOrientation"
+    flyOrientation.Attachment0 = flyAttachment
+    flyOrientation.Mode = Enum.OrientationAlignmentMode.OneAttachment
+    flyOrientation.Responsiveness = 15
+    flyOrientation.MaxTorque = math.huge
+    flyOrientation.Parent = root
+
+    flyConnection = RunService.RenderStepped:Connect(function()
+        if not flyEnabled or not character.Parent or not root.Parent then return end
+        local camera = workspace.CurrentCamera
+        if not camera then return end
+
+        local cameraLook = camera.CFrame.LookVector
+        local cameraRight = camera.CFrame.RightVector
+
+        local forward = Vector3.new(cameraLook.X, 0, cameraLook.Z)
+        local right = Vector3.new(cameraRight.X, 0, cameraRight.Z)
+
+        if forward.Magnitude > 0 then forward = forward.Unit end
+        if right.Magnitude > 0 then right = right.Unit end
+
+        local direction = Vector3.zero
+
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then direction += forward end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then direction -= forward end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then direction += right end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then direction -= right end
+
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then direction += Vector3.yAxis end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) or UserInputService:IsKeyDown(Enum.KeyCode.RightControl) then
+            direction -= Vector3.yAxis
+        end
+
+        if direction.Magnitude > 0 then
+            direction = direction.Unit
+            flyVelocity.VectorVelocity = direction * FLY_SPEED
+        else
+            flyVelocity.VectorVelocity = Vector3.zero
+        end
+
+        if forward.Magnitude > 0 then
+            flyOrientation.CFrame = CFrame.lookAt(root.Position, root.Position + forward)
+        end
+    end)
+end
+
+MainTab:CreateToggle({
+    Name = "Fly Mode",
+    CurrentValue = false,
+    Flag = "FlyMode",
+    Callback = function(Value)
+        if Value then startFly() else stopFly() end
+    end,
+})
+
+player.CharacterAdded:Connect(function()
+    if flyEnabled then
+        task.wait(0.5)
+        if flyEnabled then startFly() end
+    end
+end)
+
+--//==================================================
+--// EVENT TAB
+--//==================================================
+
+EventsTab:CreateSection("Beanstalk Event")
+
+EventsTab:CreateToggle({
+    Name = "Auto Submit All Plants (Beanstalk)",
+    CurrentValue = false,
+    Flag = "BeanstalkAutoSubmitFlag",
+    Callback = function(Value)
+        getgenv().AutoSubmitBeanstalk = Value
+        if Value then
+            task.spawn(function()
+                while getgenv().AutoSubmitBeanstalk do
+                    local eventFolder = ReplicatedStorage:FindFirstChild("GameEvents")
+                    local event = eventFolder and eventFolder:FindFirstChild("Events") 
+                        and eventFolder.Events:FindFirstChild("BeanstalkEvent") 
+                        and eventFolder.Events.BeanstalkEvent:FindFirstChild("BeanstalkRESubmitAllPlant")
+                    
+                    if event then
+                        event:FireServer()
+                    end
+                    task.wait(10)
+                end
+            end)
+        end
+    end,
+})
+
+--//==================================================
+--// SHOP TAB
+--//==================================================
+
+-- Seeds Section
+ShopTab:CreateSection("Seed Shop")
+
+local seedOptions = {
+    "Carrot", "Strawberry", "Blueberry", "Buttercup", "Orange Tulip", "Corn",
+    "Daffodil", "Tomato", "Apple", "Bamboo", "Pumpkin", "Watermelon", "Cactus",
+    "Coconut", "Dragon Fruit", "Mango", "Cacao", "Grape", "Mushroom", "Pepper",
+    "Sunflower", "Beanstalk", "Burning Bud", "Giant Pinecone", "Ember Lily",
+    "Sugar Apple", "Alien Apple", "Crimson Thorn", "Elder Strawberry",
+    "Moongrain Meadow", "Octobloom", "Romanesco", "Zebrazinkle"
+}
+
+local selectedSeeds = {}
+local autoBuySeeds = false
+
+ShopTab:CreateDropdown({
+    Name = "Select Seeds to Auto Buy",
+    Options = seedOptions,
+    CurrentOption = {},
+    MultipleOptions = true,
+    Flag = "SeedMultiDropdownFlag",
+    Callback = function(Options)
+        selectedSeeds = Options
+    end,
+})
+
+ShopTab:CreateToggle({
+    Name = "Auto Buy Seeds",
+    CurrentValue = false,
+    Flag = "AutoBuySeedsFlag",
+    Callback = function(Value)
+        autoBuySeeds = Value
+    end,
+})
+
+task.spawn(function()
+    while true do
+        if autoBuySeeds and #selectedSeeds > 0 then
+            local seedRemote = ReplicatedStorage:FindFirstChild("GameEvents") and ReplicatedStorage.GameEvents:FindFirstChild("BuySeedStock")
+            if seedRemote then
+                for _, seedName in ipairs(selectedSeeds) do
+                    pcall(function()
+                        seedRemote:FireServer("Shop", seedName)
+                    end)
+                end
+            end
+        end
+        task.wait(1)
+    end
+end)
+
+-- Gear Section
+ShopTab:CreateSection("Gear Shop")
+
+local gearOptions = {
+    "Watering Can", "Trading Ticket", "Trowel", "Recall Wrench", "Basic Sprinkler",
+    "Advanced Sprinkler", "Medium Toy", "Medium Treat", "Godly Sprinkler",
+    "Magnifying Glass", "Master Sprinkler", "Cleaning Spray", "Favorite Tool",
+    "Harvest Tool", "Friendship Pot", "Grandmaster Sprinkler", "Level Up Lollipop"
+}
+
+local selectedGears = {}
+local autoBuyGears = false
+
+ShopTab:CreateDropdown({
+    Name = "Select Gears to Auto Buy",
+    Options = gearOptions,
+    CurrentOption = {},
+    MultipleOptions = true,
+    Flag = "GearMultiDropdownFlag",
+    Callback = function(Options)
+        selectedGears = Options
+    end,
+})
+
+ShopTab:CreateToggle({
+    Name = "Auto Buy Multiple Gears",
+    CurrentValue = false,
+    Flag = "AutoBuyMultiFlag",
+    Callback = function(Value)
+        autoBuyGears = Value
+    end,
+})
+
+task.spawn(function()
+    while true do
+        if autoBuyGears and #selectedGears > 0 then
+            local buyRemote = ReplicatedStorage:FindFirstChild("GameEvents") and ReplicatedStorage.GameEvents:FindFirstChild("BuyGearStock")
+            if buyRemote then
+                for _, gearName in ipairs(selectedGears) do
+                    pcall(function()
+                        buyRemote:FireServer(gearName)
+                    end)
+                end
+            end
+        end
+        task.wait(1)
+    end
+end)
+
+-- Egg Section
+ShopTab:CreateSection("Egg Shop")
+
+local eggOptions = {
+    "Common Egg", "Uncommon Egg", "Rare Egg", "Legendary Egg",
+    "Mythical Egg", "Bug Egg", "Jungle Egg"
+}
+
+local selectedEggs = {}
+local autoBuyEggs = false
+
+ShopTab:CreateDropdown({
+    Name = "Select Eggs to Auto Buy",
+    Options = eggOptions,
+    CurrentOption = {},
+    MultipleOptions = true,
+    Flag = "EggMultiDropdownFlag",
+    Callback = function(Options)
+        selectedEggs = Options
+    end,
+})
+
+ShopTab:CreateToggle({
+    Name = "Auto Buy Eggs",
+    CurrentValue = false,
+    Flag = "AutoBuyEggsFlag",
+    Callback = function(Value)
+        autoBuyEggs = Value
+    end,
+})
+
+task.spawn(function()
+    while true do
+        if autoBuyEggs and #selectedEggs > 0 then
+            local eggRemote = ReplicatedStorage:FindFirstChild("GameEvents") and ReplicatedStorage.GameEvents:FindFirstChild("BuyPetEgg")
+            if eggRemote then
+                for _, eggType in ipairs(selectedEggs) do
+                    pcall(function()
+                        eggRemote:FireServer(eggType)
+                    end)
+                end
+            end
+        end
+        task.wait(1)
+    end
+end)
+
+--//==================================================
+--// AUTO COLLECT TAB
+--//==================================================
+
+local autoCollectEnabled = false
+local autoCollectAllEnabled = false
+local selectedFruits = {}
+local collectionRadius = 100
+local collectCooldown = 0.2
+
+local CollectRemote = ReplicatedStorage:FindFirstChild("GameEvents") 
+    and ReplicatedStorage.GameEvents:FindFirstChild("Crops") 
+    and ReplicatedStorage.GameEvents.Crops:FindFirstChild("Collect")
+
+local ALL_COLLECTIBLES = {
+    "Apple", "Coconut", "Banana", "Mango", "Dragon Fruit", "Sugar Apple", "Alien Apple", "Elder Strawberry",
+    "Carrot", "Tomato", "Corn", "Pumpkin", "Watermelon", "Bamboo", "Cactus", "Pepper", "Romanesco",
+    "Strawberry", "Blueberry", "Grape", "Moongrain Meadow",
+    "Buttercup", "Orange Tulip", "Daffodil", "Sunflower", "Burning Bud", "Ember Lily", "Crimson Thorn", "Octobloom",
+    "Mushroom", "Cacao", "Giant Pinecone", "Zebrazinkle"
+}
+
+local function getHRP()
+    local char = player.Character
+    return char and char:FindFirstChild("HumanoidRootPart")
+end
+
+local function collectItem(obj)
+    if not CollectRemote then return false end
+    return pcall(function()
+        CollectRemote:FireServer({ obj })
+    end)
+end
+
+local function getHarvestableItems()
+    local items = {}
+    local hrp = getHRP()
+    
+    local function processInstance(obj)
+        for _, name in ipairs(ALL_COLLECTIBLES) do
+            if obj.Name:lower():find(name:lower(), 1, true) then
+                local pos = nil
+                if obj:IsA("BasePart") then
+                    pos = obj.Position
+                elseif obj:IsA("Model") and obj.PrimaryPart then
+                    pos = obj.PrimaryPart.Position
+                end
+
+                local dist = (pos and hrp) and (pos - hrp.Position).Magnitude or 0
+
+                table.insert(items, {
+                    Object = obj,
+                    Name = name,
+                    Distance = dist
+                })
+                break
+            end
+        end
+    end
+
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        processInstance(obj)
+    end
+
+    if getnilinstances then
+        for _, obj in ipairs(getnilinstances()) do
+            processInstance(obj)
+        end
+    end
+
+    return items
+end
+
+local function startCollectionLoop()
+    task.spawn(function()
+        while autoCollectEnabled do
+            local items = getHarvestableItems()
+            
+            for _, item in ipairs(items) do
+                if not autoCollectEnabled then break end
+                if item.Distance > collectionRadius then continue end
+
+                if not autoCollectAllEnabled then
+                    local selected = false
+                    for _, name in ipairs(selectedFruits) do
+                        if item.Name:lower() == name:lower() then
+                            selected = true
+                            break
+                        end
+                    end
+                    if not selected then continue end
+                end
+
+                collectItem(item.Object)
+                task.wait(collectCooldown)
+            end
+            
+            task.wait(0.5)
+        end
+    end)
+end
+
+AutomaticallyTab:CreateSection("Collect Plant")
+
+AutomaticallyTab:CreateToggle({
+    Name = "Auto Collect ALL Crops",
+    CurrentValue = false,
+    Callback = function(Value)
+        autoCollectAllEnabled = Value
+        autoCollectEnabled = Value
+        if Value then startCollectionLoop() end
+    end,
+})
+
+AutomaticallyTab:CreateSection("Specific Selection")
+
+local CropDropdown
+
+AutomaticallyTab:CreateInput({
+    Name = "🔍 Search & Select Plant",
+    PlaceholderText = "Type plant name (e.g. Apple, Carrot)",
+    RemoveTextAfterFocusLost = false,
+    Callback = function(Text)
+        if Text == "" then return end
+        
+        local textLower = Text:lower()
+        local matches = {}
+        
+        for _, plant in ipairs(ALL_COLLECTIBLES) do
+            if plant:lower():find(textLower, 1, true) then
+                table.insert(matches, plant)
+            end
+        end
+        
+        if #matches > 0 then
+            for _, match in ipairs(matches) do
+                local alreadySelected = false
+                for _, sel in ipairs(selectedFruits) do
+                    if sel:lower() == match:lower() then
+                        alreadySelected = true
+                        break
+                    end
+                end
+                
+                if not alreadySelected then
+                    table.insert(selectedFruits, match)
+                end
+            end
+            
+            if CropDropdown then
+                CropDropdown:Set(selectedFruits)
+            end
+            
+            Rayfield:Notify({
+                Title = "Plant Added",
+                Content = "Added: " .. table.concat(matches, ", "),
+                Duration = 3,
+            })
+        else
+            Rayfield:Notify({
+                Title = "Not Found",
+                Content = "No plants matching '" .. Text .. "'",
+                Duration = 3,
+            })
+        end
+    end,
+})
+
+CropDropdown = AutomaticallyTab:CreateDropdown({
+    Name = "Select Specific Crops (Manual List)",
+    Options = ALL_COLLECTIBLES,
+    CurrentOption = {},
+    MultipleOptions = true,
+    Callback = function(Options)
+        selectedFruits = Options
+    end,
+})
+
+AutomaticallyTab:CreateButton({
+    Name = "❌ Clear Selected Plants Filter",
+    Callback = function()
+        selectedFruits = {}
+        if CropDropdown then
+            CropDropdown:Set({})
+        end
+        Rayfield:Notify({
+            Title = "Filter Cleared",
+            Content = "All selected plants removed.",
+            Duration = 2,
+        })
+    end,
+})
+
+AutomaticallyTab:CreateToggle({
+    Name = "Auto Collect Selected Only",
+    CurrentValue = false,
+    Callback = function(Value)
+        if Value and #selectedFruits == 0 then
+            Rayfield:Notify({
+                Title = "Selection Error",
+                Content = "Please search or select at least one plant first!",
+                Duration = 3,
+            })
+            return
+        end
+        
+        autoCollectAllEnabled = false
+        autoCollectEnabled = Value
+        if Value then startCollectionLoop() end
+    end,
+})
+
+AutomaticallyTab:CreateSection("Settings")
+
+AutomaticallyTab:CreateSlider({
+    Name = "Radius (Studs)",
+    Range = {10, 500},
+    Increment = 10,
+    CurrentValue = collectionRadius,
+    Callback = function(Value)
+        collectionRadius = Value
+    end,
+})
+
+AutomaticallyTab:CreateSlider({
+    Name = "Delay Between Collects",
+    Range = {0.05, 1},
+    Increment = 0.05,
+    CurrentValue = collectCooldown,
+    Callback = function(Value)
+        collectCooldown = Value
+    end,
+})
+
+--//==================================================
+--// THEMES TAB
+--//==================================================
+
+ThemeTab:CreateSection("Themes")
+
+local Button = ThemeTab:CreateButton({
+   Name = "Default",
+   Callback = function()
+   Window.ModifyTheme('Default')
+   end,
+})
+
+local Button = ThemeTab:CreateButton({
+   Name = "AmberGlow",
+   Callback = function()
+   Window.ModifyTheme('AmberGlow')
+   end,
+})
+
+local Button = ThemeTab:CreateButton({
+   Name = "Amethyst",
+   Callback = function()
+   Window.ModifyTheme('Amethyst')
+   end,
+})
+
+local Button = ThemeTab:CreateButton({
+   Name = "Bloom",
+   Callback = function()
+   Window.ModifyTheme('Bloom')
+   end,
+})
+
+local Button = ThemeTab:CreateButton({
+   Name = "DarkBlue",
+   Callback = function()
+   Window.ModifyTheme('DarkBlue')
+   end,
+})
+
+local Button = ThemeTab:CreateButton({
+   Name = "Green",
+   Callback = function()
+   Window.ModifyTheme('Green')
+   end,
+})
+
+local Button = ThemeTab:CreateButton({
+   Name = "Light",
+   Callback = function()
+   Window.ModifyTheme('Light')
+   end,
+})
+
+local Button = ThemeTab:CreateButton({
+   Name = "Ocean",
+   Callback = function()
+   Window.ModifyTheme('Ocean')
+   end,
+})
+
+local Button = ThemeTab:CreateButton({
+   Name = "Serenity",
+   Callback = function()
+   Window.ModifyTheme('Serenity')
+   end,
+})
+
