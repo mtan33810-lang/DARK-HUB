@@ -109,41 +109,33 @@ MainTab:CreateSlider({
         end
     end,
 })
+
 --//==================================================
---// FLY MECHANICS (FIXED)
+--// FLY MECHANICS (DIRECT ASSEMBLY MOVEMENT)
 --//==================================================
 
 local flyEnabled = false
 local flyConnection = nil
-local flyVelocity = nil
-local flyGyro = nil
 local FLY_SPEED = 60
-
-local function cleanupFly()
-    if flyConnection then 
-        flyConnection:Disconnect() 
-        flyConnection = nil 
-    end
-    if flyVelocity then 
-        flyVelocity:Destroy() 
-        flyVelocity = nil 
-    end
-    if flyGyro then 
-        flyGyro:Destroy() 
-        flyGyro = nil 
-    end
-end
 
 local function stopFly()
     flyEnabled = false
-    cleanupFly()
+    if flyConnection then
+        flyConnection:Disconnect()
+        flyConnection = nil
+    end
     
     local character = player.Character
     if character then
         local humanoid = character:FindFirstChildOfClass("Humanoid")
+        local root = character:FindFirstChild("HumanoidRootPart")
+        
         if humanoid then
             humanoid.PlatformStand = false
             humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
+        end
+        if root then
+            root.AssemblyLinearVelocity = Vector3.zero
         end
     end
 end
@@ -156,65 +148,53 @@ local function startFly()
     local root = character:WaitForChild("HumanoidRootPart")
 
     flyEnabled = true
-    humanoid.PlatformStand = true -- Freezes default humanoid physics
-
-    -- BodyVelocity handles overall linear motion cleanly
-    flyVelocity = Instance.new("BodyVelocity")
-    flyVelocity.Name = "FlyVelocity"
-    flyVelocity.MaxForce = Vector3.new(1e9, 1e9, 1e9)
-    flyVelocity.Velocity = Vector3.zero
-    flyVelocity.Parent = root
-
-    -- BodyGyro prevents character tilting or falling over
-    flyGyro = Instance.new("BodyGyro")
-    flyGyro.Name = "FlyGyro"
-    flyGyro.MaxTorque = Vector3.new(1e9, 1e9, 1e9)
-    flyGyro.P = 9e4
-    flyGyro.CFrame = root.CFrame
-    flyGyro.Parent = root
 
     flyConnection = RunService.RenderStepped:Connect(function()
-        if not flyEnabled or not character.Parent or not root.Parent then 
+        if not flyEnabled or not character.Parent or not root.Parent then
             stopFly()
-            return 
+            return
         end
-        
+
         local camera = workspace.CurrentCamera
         if not camera then return end
+
+        -- Force platform stand every frame to override ground checks
+        humanoid.PlatformStand = true
 
         local direction = Vector3.zero
         local cameraCFrame = camera.CFrame
 
-        -- Movement relative to camera perspective
-        if UserInputService:IsKeyDown(Enum.KeyCode.W) then 
-            direction += cameraCFrame.LookVector 
+        -- 3D Movement relative to camera facing direction
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then
+            direction += cameraCFrame.LookVector
         end
-        if UserInputService:IsKeyDown(Enum.KeyCode.S) then 
-            direction -= cameraCFrame.LookVector 
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then
+            direction -= cameraCFrame.LookVector
         end
-        if UserInputService:IsKeyDown(Enum.KeyCode.D) then 
-            direction += cameraCFrame.RightVector 
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then
+            direction += cameraCFrame.RightVector
         end
-        if UserInputService:IsKeyDown(Enum.KeyCode.A) then 
-            direction -= cameraCFrame.RightVector 
-        end
-
-        -- Vertical control
-        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then 
-            direction += Vector3.yAxis 
-        end
-        if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) or UserInputService:IsKeyDown(Enum.KeyCode.RightControl) then 
-            direction -= Vector3.yAxis 
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then
+            direction -= cameraCFrame.RightVector
         end
 
-        -- Update physics targets
+        -- Direct vertical controls
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+            direction += Vector3.yAxis
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) or UserInputService:IsKeyDown(Enum.KeyCode.RightControl) then
+            direction -= Vector3.yAxis
+        end
+
+        -- Face the camera direction
+        root.CFrame = CFrame.lookAt(root.Position, root.Position + cameraCFrame.LookVector)
+
+        -- Apply velocity directly to the character assembly
         if direction.Magnitude > 0 then
-            flyVelocity.Velocity = direction.Unit * FLY_SPEED
+            root.AssemblyLinearVelocity = direction.Unit * FLY_SPEED
         else
-            flyVelocity.Velocity = Vector3.zero
+            root.AssemblyLinearVelocity = Vector3.zero
         end
-
-        flyGyro.CFrame = cameraCFrame
     end)
 end
 
@@ -223,10 +203,10 @@ MainTab:CreateToggle({
     CurrentValue = false,
     Flag = "FlyMode",
     Callback = function(Value)
-        if Value then 
-            startFly() 
-        else 
-            stopFly() 
+        if Value then
+            startFly()
+        else
+            stopFly()
         end
     end,
 })
@@ -236,37 +216,7 @@ player.CharacterAdded:Connect(function()
         task.wait(0.5)
         if flyEnabled then startFly() end
     end
-end)
-
---//==================================================
---// EVENT TAB
---//==================================================
-
-EventsTab:CreateSection("Beanstalk Event")
-
-EventsTab:CreateToggle({
-    Name = "Auto Submit All Plants (Beanstalk)",
-    CurrentValue = false,
-    Flag = "BeanstalkAutoSubmitFlag",
-    Callback = function(Value)
-        getgenv().AutoSubmitBeanstalk = Value
-        if Value then
-            task.spawn(function()
-                while getgenv().AutoSubmitBeanstalk do
-                    local eventFolder = ReplicatedStorage:FindFirstChild("GameEvents")
-                    local event = eventFolder and eventFolder:FindFirstChild("Events") 
-                        and eventFolder.Events:FindFirstChild("BeanstalkEvent") 
-                        and eventFolder.Events.BeanstalkEvent:FindFirstChild("BeanstalkRESubmitAllPlant")
-                    
-                    if event then
-                        event:FireServer()
-                    end
-                    task.wait(10)
-                end
-            end)
-        end
-    end,
-})
+end)  
 
 --//==================================================
 --// SHOP TAB
