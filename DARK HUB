@@ -433,7 +433,7 @@ local ALL_COLLECTIBLES = {
     "Carrot", "Tomato", "Corn", "Pumpkin", "Watermelon", "Bamboo", "Cactus", "Pepper", "Romanesco",
     "Strawberry", "Blueberry", "Grape", "Moongrain Meadow",
     "Buttercup", "Orange Tulip", "Daffodil", "Sunflower", "Burning Bud", "Ember Lily", "Crimson Thorn", "Octobloom",
-    "Mushroom", "Cacao", "Giant Pinecone", "Zebrazinkle", "Carrot",
+    "Mushroom", "Cacao", "Giant Pinecone", "Zebrazinkle"
 }
 
 local MUTATIONS_LIST = {
@@ -451,24 +451,47 @@ local function collectItem(obj)
     local cropsFolder = gameEvents and gameEvents:FindFirstChild("Crops")
     local collectRemote = cropsFolder and cropsFolder:FindFirstChild("Collect")
     
-    if not collectRemote then return false end
+    if not collectRemote then 
+        warn("[ERROR] Collect Remote not found in ReplicatedStorage.GameEvents.Crops.Collect!")
+        return false 
+    end
     
+    print("[COLLECTING] Firing Remote for:", obj:GetFullName())
     return pcall(function()
         collectRemote:FireServer({ obj })
     end)
 end
 
--- Helper to check if an object or string contains mutation attributes/names
+-- Helper to check if an object or string contains mutation attributes/names/labels
 local function getObjectMutation(obj)
-    -- 1. Check object attribute/property if the game uses attributes
-    local attrMutation = obj:GetAttribute("Mutation") or obj:GetAttribute("Variant")
-    if attrMutation then return tostring(attrMutation) end
+    -- 1. Check object attributes
+    for _, attrName in ipairs({"Mutation", "Variant", "Tier", "Type", "IsMutated"}) do
+        local val = obj:GetAttribute(attrName)
+        if val then 
+            print("[DEBUG] Mutation found via Attribute (" .. attrName .. "):", val, "on Object:", obj:GetFullName())
+            return tostring(val) 
+        end
+    end
 
     -- 2. Check Object Name for mutation keywords
     local objNameLower = obj.Name:lower()
     for _, mut in ipairs(MUTATIONS_LIST) do
         if objNameLower:find(mut:lower(), 1, true) then
+            print("[DEBUG] Mutation found via Name:", mut, "on Object:", obj.Name)
             return mut
+        end
+    end
+
+    -- 3. Check for BillboardGuis or TextLabels attached to the crop
+    for _, child in ipairs(obj:GetDescendants()) do
+        if child:IsA("TextLabel") or child:IsA("TextButton") then
+            local textLower = child.Text:lower()
+            for _, mut in ipairs(MUTATIONS_LIST) do
+                if textLower:find(mut:lower(), 1, true) then
+                    print("[DEBUG] Mutation found via TextLabel (" .. child.Text .. "):", mut, "on Object:", obj.Name)
+                    return mut
+                end
+            end
         end
     end
 
@@ -483,8 +506,10 @@ local function getHarvestableItems()
     local hrpPos = hrp.Position
 
     local function checkAndInsert(obj)
+        local nameLower = obj.Name:lower()
+        
         for _, name in ipairs(ALL_COLLECTIBLES) do
-            if obj.Name:lower():find(name:lower(), 1, true) then
+            if nameLower:find(name:lower(), 1, true) then
                 local pos = nil
                 if obj:IsA("BasePart") then
                     pos = obj.Position
@@ -496,6 +521,9 @@ local function getHarvestableItems()
                     local dist = (pos - hrpPos).Magnitude
                     if dist <= collectionRadius then
                         local detectedMutation = getObjectMutation(obj)
+
+                        print(string.format("[SCANNER] Found Crop: %s | Object Name: %s | Mutation: %s | Distance: %.1f studs", 
+                            name, obj.Name, detectedMutation or "None", dist))
 
                         table.insert(items, {
                             Object = obj,
@@ -510,11 +538,17 @@ local function getHarvestableItems()
         end
     end
 
+    -- Scan Workspace recursively up to 3 levels deep
     for _, obj in ipairs(Workspace:GetChildren()) do
         checkAndInsert(obj)
         if obj:IsA("Folder") or obj:IsA("Model") then
             for _, child in ipairs(obj:GetChildren()) do
                 checkAndInsert(child)
+                if child:IsA("Folder") or child:IsA("Model") then
+                    for _, subChild in ipairs(child:GetChildren()) do
+                        checkAndInsert(subChild)
+                    end
+                end
             end
         end
     end
