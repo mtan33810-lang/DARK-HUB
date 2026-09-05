@@ -262,110 +262,90 @@ EventsTab:CreateToggle({
     end,
 })
 
-local autoBuyEventShop = false
-local buyShopDelay = 1
-local selectedShopItem = "1"
+EventsTab:CreateSection("Honey Coin Shop")
 
-local shopItems = {
-    ["🌱 Sprout Seed Pack"] = "1",
-    ["🥚 Sprout Egg"] = "2",
-    ["🌿 Mandrake Seed"] = "3",
-    ["📦 Sprout Crate"] = "4",
-    ["🧪 Silver Fertilizer"] = "5",
-    ["🍈 Canary Melon Seed"] = "6",
-    ["💗 Amberheart"] = "7",
-    ["🐉 Spriggan"] = "8",
-    ["🖼️ Golden Goose Painting"] = "9",
-    ["🪑 Bean Chair"] = "10",
-    ["🖼️ Giant Painting"] = "11",
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local shopOptions = {
+    "Honey Honey Daisy",
+    "Honey Honey Dew",
+    "Honey Hive Seed Pack",
+    "Honey Ambercomb",
+    "Pollen Radar 2026",
+    "Honey Coneflower",
+    "Hive Egg",
+    "Hive Crate",
+    "Professor Bee",
+    "Honey Badger",
+    "Honey Birds of Paradise",
+    "Honey Honey Hollow"
 }
 
-local shopItemNames = {}
-
-for itemName in pairs(shopItems) do
-    table.insert(shopItemNames, itemName)
-end
-
-table.sort(shopItemNames)
-
-local function buyEventStock(itemId)
-    local gameEvents = ReplicatedStorage:FindFirstChild("GameEvents")
-    local buyRemote = gameEvents and gameEvents:FindFirstChild("BuyEventShopStock")
-
-    if buyRemote then
-        print("[EVENT SHOP] Buying:", itemId)
-        buyRemote:FireServer(itemId)
-    else
-        warn("[ERROR] BuyEventShopStock Remote not found!")
-    end
-end
+local selectedShopItems = {}
+local autoBuyShopItems = false
+local shopBuyDelay = 1
 
 EventsTab:CreateDropdown({
-    Name = "🛒 Select Event Shop Item",
-    Options = shopItemNames,
-    CurrentOption = {"🌱 Sprout Seed Pack"},
-    MultipleOptions = false,
-    Flag = "EventShopItem",
-    Callback = function(Option)
-        local selectedName = Option[1]
-
-        if shopItems[selectedName] then
-            selectedShopItem = shopItems[selectedName]
-
-            print(
-                "[EVENT SHOP] Selected:",
-                selectedName,
-                "ID:",
-                selectedShopItem
-            )
+    Name = "Select Items to Auto Buy",
+    Options = shopOptions,
+    CurrentOption = {},
+    MultipleOptions = true,
+    Flag = "CoinShopMultiDropdownFlag",
+    Callback = function(Options)
+        selectedShopItems = {}
+        if typeof(Options) == "table" then
+            for key, value in pairs(Options) do
+                if typeof(value) == "string" then
+                    table.insert(selectedShopItems, value)
+                elseif value == true and typeof(key) == "string" then
+                    table.insert(selectedShopItems, key)
+                end
+            end
+        elseif typeof(Options) == "string" then
+            table.insert(selectedShopItems, Options)
         end
-    end,
-})
-
-EventsTab:CreateButton({
-    Name = "🛍️ Buy Selected Item Stock Once",
-    Callback = function()
-        buyEventStock(selectedShopItem)
-
-        Rayfield:Notify({
-            Title = "Shop Purchase",
-            Content = "Attempted purchase: " .. tostring(selectedShopItem),
-            Duration = 3,
-        })
     end,
 })
 
 EventsTab:CreateToggle({
-    Name = "🔄 Auto Buy Event Shop Stock",
+    Name = "Auto Buy Selected Item",
     CurrentValue = false,
-    Flag = "AutoBuyEventShopFlag",
-
+    Flag = "AutoBuyCoinShopFlag",
     Callback = function(Value)
-        autoBuyEventShop = Value
+        autoBuyShopItems = Value
 
         if Value then
+            Rayfield:Notify({
+                Title = "Auto Buy Coin Shop",
+                Content = "Started auto-buying shop items.",
+                Duration = 3,
+            })
+
             task.spawn(function()
-                while autoBuyEventShop do
-                    buyEventStock(selectedShopItem)
-                    task.wait(buyShopDelay)
+                while autoBuyShopItems do
+                    if #selectedShopItems > 0 then
+                        local gameEvents = ReplicatedStorage:FindFirstChild("GameEvents")
+                        local buyEvent = gameEvents and gameEvents:FindFirstChild("BuyEventShopStock")
+
+                        if buyEvent and buyEvent:IsA("RemoteEvent") then
+                            for _, itemName in ipairs(selectedShopItems) do
+                                if not autoBuyShopItems then break end
+                                buyEvent:FireServer(itemName, "Honey Coin Shop")
+                            end
+                        end
+                    end
+                    task.wait(shopBuyDelay)
                 end
             end)
+        else
+            Rayfield:Notify({
+                Title = "Auto Buy Coin Shop",
+                Content = "Stopped auto-buying shop items.",
+                Duration = 3,
+            })
         end
     end,
 })
-
-EventsTab:CreateSlider({
-    Name = "Purchase Loop Delay (Sec)",
-    Range = {0.1, 5},
-    Increment = 0.1,
-    CurrentValue = buyShopDelay,
-    Flag = "EventShopDelay",
-
-    Callback = function(Value)
-        buyShopDelay = Value
-    end,
-})
-
 
 --//==================================================
 --// SHOP TAB
