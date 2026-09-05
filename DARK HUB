@@ -695,239 +695,707 @@ task.spawn(function()
     end
 end)
 
---//==================================================
---// AUTO COLLECT TAB
---//==================================================
+--============================================================
+-- AUTO COLLECT SETTINGS
+--============================================================
 
-local autoCollectEnabled = false
-local autoCollectAllEnabled = false
-local selectedFruits = {}
-local collectionRadius = 100
-local collectCooldown = 0.2
+local AutoCollectEnabled = false
+local AutoCollectAll = false
+local MutationOnly = false
 
-local CollectRemote = ReplicatedStorage:FindFirstChild("GameEvents") 
-    and ReplicatedStorage.GameEvents:FindFirstChild("Crops") 
-    and ReplicatedStorage.GameEvents.Crops:FindFirstChild("Collect")
+local SelectedPlants = {}
+local SelectedMutations = {}
 
-local ALL_COLLECTIBLES = {
-    "Apple", "Coconut", "Banana", "Mango", "Dragon Fruit", "Sugar Apple", "Alien Apple", "Elder Strawberry",
-    "Carrot", "Tomato", "Corn", "Pumpkin", "Watermelon", "Bamboo", "Cactus", "Pepper", "Romanesco",
-    "Strawberry", "Blueberry", "Grape", "Moongrain Meadow",
-    "Buttercup", "Orange Tulip", "Daffodil", "Sunflower", "Burning Bud", "Ember Lily", "Crimson Thorn", "Octobloom",
-    "Mushroom", "Cacao", "Giant Pinecone", "Zebrazinkle"
+local CollectionRadius = 100
+local CollectCooldown = 0.1
+
+local CollectLoopRunning = false
+
+--============================================================
+-- PLANTS
+--============================================================
+
+local ALL_PLANTS = {
+    "Apple",
+    "Coconut",
+    "Banana",
+    "Mango",
+    "Dragon Fruit",
+    "Sugar Apple",
+    "Alien Apple",
+    "Elder Strawberry",
+
+    "Carrot",
+    "Tomato",
+    "Corn",
+    "Pumpkin",
+    "Watermelon",
+    "Bamboo",
+    "Cactus",
+    "Pepper",
+    "Romanesco",
+
+    "Strawberry",
+    "Blueberry",
+    "Grape",
+    "Moongrain Meadow",
+    "Daisy",
+    "Honey Dew",
+
+    "Buttercup",
+    "Orange Tulip",
+    "Daffodil",
+    "Sunflower",
+    "Burning Bud",
+    "Ember Lily",
+    "Crimson Thorn",
+    "Octobloom",
+
+    "Mushroom",
+    "Cacao",
+    "Giant Pinecone",
+    "Zebrazinkle",
+    "Coneflower",
+    "Birds of Paradise",
+    "Hollow"
 }
 
-local function getHRP()
-    local char = player.Character
-    return char and char:FindFirstChild("HumanoidRootPart")
+--============================================================
+-- MUTATIONS
+--============================================================
+
+local ALL_MUTATIONS = {
+    "Golden",
+    "Rainbow",
+    "Shiny",
+    "Giant",
+    "Mutated",
+    "Mega",
+    "Corrupted",
+    "Glowing",
+    "Frozen",
+    "Radiant"
+}
+
+--============================================================
+-- SELECTION HELPERS
+--============================================================
+
+local function contains(List, Value)
+    for _, Item in ipairs(List) do
+        if Item == Value then
+            return true
+        end
+    end
+
+    return false
 end
 
-local function collectItem(obj)
-    if not CollectRemote then return false end
-    return pcall(function()
-        CollectRemote:FireServer({ obj })
-    end)
+local function addSelection(List, Value)
+    if not contains(List, Value) then
+        table.insert(List, Value)
+    end
 end
 
-local function getHarvestableItems()
-    local items = {}
-    local hrp = getHRP()
-    
-    local function processInstance(obj)
-        for _, name in ipairs(ALL_COLLECTIBLES) do
-            if obj.Name:lower():find(name:lower(), 1, true) then
-                local pos = nil
-                if obj:IsA("BasePart") then
-                    pos = obj.Position
-                elseif obj:IsA("Model") and obj.PrimaryPart then
-                    pos = obj.PrimaryPart.Position
-                end
+local function convertSelection(Value)
+    local Result = {}
 
-                local dist = (pos and hrp) and (pos - hrp.Position).Magnitude or 0
+    if typeof(Value) == "string" then
+        table.insert(Result, Value)
+        return Result
+    end
 
-                table.insert(items, {
-                    Object = obj,
-                    Name = name,
-                    Distance = dist
-                })
-                break
+    if typeof(Value) ~= "table" then
+        return Result
+    end
+
+    for Key, Item in pairs(Value) do
+        if typeof(Item) == "string" then
+            table.insert(Result, Item)
+
+        elseif Item == true and typeof(Key) == "string" then
+            table.insert(Result, Key)
+        end
+    end
+
+    return Result
+end
+
+--============================================================
+-- MATCHING
+--============================================================
+
+local function matchesPlant(Name)
+    if AutoCollectAll then
+        return true
+    end
+
+    if #SelectedPlants == 0 then
+        return false
+    end
+
+    local LowerName = Name:lower()
+
+    for _, Plant in ipairs(SelectedPlants) do
+        if LowerName:find(
+            Plant:lower(),
+            1,
+            true
+        ) then
+            return true
+        end
+    end
+
+    return false
+end
+
+local function matchesMutation(Name)
+    if not MutationOnly then
+        return true
+    end
+
+    local LowerName = Name:lower()
+
+    if #SelectedMutations > 0 then
+        for _, Mutation in ipairs(SelectedMutations) do
+            if LowerName:find(
+                Mutation:lower(),
+                1,
+                true
+            ) then
+                return true
             end
         end
+
+        return false
     end
 
-    for _, obj in ipairs(Workspace:GetDescendants()) do
-        processInstance(obj)
-    end
-
-    if getnilinstances then
-        for _, obj in ipairs(getnilinstances()) do
-            processInstance(obj)
+    for _, Mutation in ipairs(ALL_MUTATIONS) do
+        if LowerName:find(
+            Mutation:lower(),
+            1,
+            true
+        ) then
+            return true
         end
     end
 
-    return items
+    return false
 end
 
-local function startCollectionLoop()
-    task.spawn(function()
-        while autoCollectEnabled do
-            local items = getHarvestableItems()
-            
-            for _, item in ipairs(items) do
-                if not autoCollectEnabled then break end
-                if item.Distance > collectionRadius then continue end
+--============================================================
+-- OBJECT POSITION
+--============================================================
 
-                if not autoCollectAllEnabled then
-                    local selected = false
-                    for _, name in ipairs(selectedFruits) do
-                        if item.Name:lower() == name:lower() then
-                            selected = true
-                            break
-                        end
+local function getObjectPosition(Object)
+    if not Object then
+        return nil
+    end
+
+    if Object:IsA("BasePart") then
+        return Object.Position
+    end
+
+    if Object:IsA("Model") then
+        if Object.PrimaryPart then
+            return Object.PrimaryPart.Position
+        end
+
+        return Object:GetPivot().Position
+    end
+
+    return nil
+end
+
+--============================================================
+-- FARM
+--============================================================
+
+local function getFarm()
+    return Workspace:FindFirstChild("Farm", true)
+end
+
+--============================================================
+-- COLLECT REMOTE
+--============================================================
+
+-- This should point to a RemoteEvent belonging to YOUR game.
+-- The server should validate ownership, distance, item state,
+-- cooldowns, and whether the plant can actually be collected.
+
+local function getCollectRemote()
+    local GameEvents = ReplicatedStorage:FindFirstChild("GameEvents")
+
+    if not GameEvents then
+        return nil
+    end
+
+    local Crops = GameEvents:FindFirstChild("Crops")
+
+    if not Crops then
+        return nil
+    end
+
+    local Collect = Crops:FindFirstChild("Collect")
+
+    if Collect and Collect:IsA("RemoteEvent") then
+        return Collect
+    end
+
+    return nil
+end
+
+--============================================================
+-- FIND NEARBY PLANTS
+--============================================================
+
+local function getNearbyPlants()
+    local Results = {}
+
+    local RootPart = getRootPart()
+
+    if not RootPart then
+        return Results
+    end
+
+    local Farm = getFarm()
+
+    if not Farm then
+        return Results
+    end
+
+    local Origin = RootPart.Position
+    local Seen = {}
+
+    for _, Object in ipairs(Farm:GetDescendants()) do
+        if Object:IsA("Model") and not Seen[Object] then
+            Seen[Object] = true
+
+            local Name = Object.Name
+
+            if matchesPlant(Name)
+                and matchesMutation(Name) then
+
+                local Position =
+                    getObjectPosition(Object)
+
+                if Position then
+                    local Distance =
+                        (Position - Origin).Magnitude
+
+                    if Distance <= CollectionRadius then
+                        table.insert(
+                            Results,
+                            Object
+                        )
                     end
-                    if not selected then continue end
+                end
+            end
+        end
+    end
+
+    return Results
+end
+
+--============================================================
+-- COLLECT ONE PLANT
+--============================================================
+
+local function collectPlant(Plant)
+    if not Plant then
+        return false
+    end
+
+    if not Plant.Parent then
+        return false
+    end
+
+    local CollectRemote = getCollectRemote()
+
+    if not CollectRemote then
+        return false
+    end
+
+    local Success = pcall(function()
+        -- Match this argument format to YOUR server API.
+        CollectRemote:FireServer({
+            Plant
+        })
+    end)
+
+    return Success
+end
+
+--============================================================
+-- AUTO COLLECT LOOP
+--============================================================
+
+local function startAutoCollect()
+    if CollectLoopRunning then
+        return
+    end
+
+    CollectLoopRunning = true
+
+    task.spawn(function()
+        while AutoCollectEnabled do
+            local Plants = getNearbyPlants()
+
+            for _, Plant in ipairs(Plants) do
+                if not AutoCollectEnabled then
+                    break
                 end
 
-                collectItem(item.Object)
-                task.wait(collectCooldown)
+                if Plant and Plant.Parent then
+                    collectPlant(Plant)
+                end
+
+                task.wait(
+                    math.max(
+                        CollectCooldown,
+                        0.01
+                    )
+                )
             end
-            
-            task.wait(0.5)
+
+            task.wait(0.2)
         end
+
+        CollectLoopRunning = false
     end)
 end
 
-AutomaticallyTab:CreateSection("Collect Plant")
+local function stopAutoCollect()
+    AutoCollectEnabled = false
+end
+
+local function setAutoCollect(Value, AllMode)
+    AutoCollectEnabled = Value
+    AutoCollectAll = AllMode
+
+    if Value then
+        startAutoCollect()
+    end
+end
+
+--============================================================
+-- AUTOMATICALLY TAB
+--============================================================
+
+AutomaticallyTab:CreateSection("Main Controls")
 
 AutomaticallyTab:CreateToggle({
-    Name = "Auto Collect ALL Crops",
+    Name = "Auto Collect ALL Plants",
     CurrentValue = false,
+    Flag = "AutoCollectAll",
+
     Callback = function(Value)
-        autoCollectAllEnabled = Value
-        autoCollectEnabled = Value
-        if Value then startCollectionLoop() end
-    end,
-})
+        if Value then
+            setAutoCollect(true, true)
 
-AutomaticallyTab:CreateSection("Specific Selection")
-
-local CropDropdown
-
-AutomaticallyTab:CreateInput({
-    Name = "🔍 Search & Select Plant",
-    PlaceholderText = "Type plant name (e.g. Apple, Carrot)",
-    RemoveTextAfterFocusLost = false,
-    Callback = function(Text)
-        if Text == "" then return end
-        
-        local textLower = Text:lower()
-        local matches = {}
-        
-        for _, plant in ipairs(ALL_COLLECTIBLES) do
-            if plant:lower():find(textLower, 1, true) then
-                table.insert(matches, plant)
-            end
-        end
-        
-        if #matches > 0 then
-            for _, match in ipairs(matches) do
-                local alreadySelected = false
-                for _, sel in ipairs(selectedFruits) do
-                    if sel:lower() == match:lower() then
-                        alreadySelected = true
-                        break
-                    end
-                end
-                
-                if not alreadySelected then
-                    table.insert(selectedFruits, match)
-                end
-            end
-            
-            if CropDropdown then
-                CropDropdown:Set(selectedFruits)
-            end
-            
             Rayfield:Notify({
-                Title = "Plant Added",
-                Content = "Added: " .. table.concat(matches, ", "),
-                Duration = 3,
+                Title = "Auto Collect",
+                Content = "Collecting nearby plants.",
+                Duration = 3
             })
         else
+            AutoCollectAll = false
+            stopAutoCollect()
+
             Rayfield:Notify({
-                Title = "Not Found",
-                Content = "No plants matching '" .. Text .. "'",
-                Duration = 3,
+                Title = "Auto Collect",
+                Content = "Stopped.",
+                Duration = 2
             })
         end
-    end,
+    end
 })
 
-CropDropdown = AutomaticallyTab:CreateDropdown({
-    Name = "Select Specific Crops (Manual List)",
-    Options = ALL_COLLECTIBLES,
-    CurrentOption = {},
-    MultipleOptions = true,
-    Callback = function(Options)
-        selectedFruits = Options
-    end,
-})
+--============================================================
+-- MUTATION FILTER
+--============================================================
 
-AutomaticallyTab:CreateButton({
-    Name = "❌ Clear Selected Plants Filter",
-    Callback = function()
-        selectedFruits = {}
-        if CropDropdown then
-            CropDropdown:Set({})
-        end
-        Rayfield:Notify({
-            Title = "Filter Cleared",
-            Content = "All selected plants removed.",
-            Duration = 2,
-        })
-    end,
-})
+AutomaticallyTab:CreateSection("Mutation Filter")
 
 AutomaticallyTab:CreateToggle({
-    Name = "Auto Collect Selected Only",
+    Name = "Mutation Plants Only",
     CurrentValue = false,
+    Flag = "MutationOnly",
+
     Callback = function(Value)
-        if Value and #selectedFruits == 0 then
-            Rayfield:Notify({
-                Title = "Selection Error",
-                Content = "Please search or select at least one plant first!",
-                Duration = 3,
-            })
+        MutationOnly = Value
+    end
+})
+
+local MutationDropdown
+
+AutomaticallyTab:CreateInput({
+    Name = "Search Mutation",
+    PlaceholderText = "Example: Golden",
+    RemoveTextAfterFocusLost = false,
+
+    Callback = function(Text)
+        if Text == "" then
             return
         end
-        
-        autoCollectAllEnabled = false
-        autoCollectEnabled = Value
-        if Value then startCollectionLoop() end
-    end,
+
+        local Search = Text:lower()
+        local Found = {}
+
+        for _, Mutation in ipairs(ALL_MUTATIONS) do
+            if Mutation:lower():find(
+                Search,
+                1,
+                true
+            ) then
+                table.insert(
+                    Found,
+                    Mutation
+                )
+            end
+        end
+
+        if #Found == 0 then
+            Rayfield:Notify({
+                Title = "Mutation Search",
+                Content = "No mutation found.",
+                Duration = 2
+            })
+
+            return
+        end
+
+        for _, Mutation in ipairs(Found) do
+            addSelection(
+                SelectedMutations,
+                Mutation
+            )
+        end
+
+        if MutationDropdown then
+            MutationDropdown:Set(
+                SelectedMutations
+            )
+        end
+
+        Rayfield:Notify({
+            Title = "Mutation Added",
+            Content = table.concat(
+                Found,
+                ", "
+            ),
+            Duration = 2
+        })
+    end
 })
+
+MutationDropdown = AutomaticallyTab:CreateDropdown({
+    Name = "Select Mutations",
+    Options = ALL_MUTATIONS,
+    CurrentOption = {},
+    MultipleOptions = true,
+    Flag = "SelectedMutations",
+
+    Callback = function(Options)
+        SelectedMutations =
+            convertSelection(Options)
+    end
+})
+
+--============================================================
+-- PLANT FILTER
+--============================================================
+
+AutomaticallyTab:CreateSection("Plant Filter")
+
+local PlantDropdown
+
+AutomaticallyTab:CreateInput({
+    Name = "Search Plant",
+    PlaceholderText = "Example: Apple",
+    RemoveTextAfterFocusLost = false,
+
+    Callback = function(Text)
+        if Text == "" then
+            return
+        end
+
+        local Search = Text:lower()
+        local Found = {}
+
+        for _, Plant in ipairs(ALL_PLANTS) do
+            if Plant:lower():find(
+                Search,
+                1,
+                true
+            ) then
+                table.insert(
+                    Found,
+                    Plant
+                )
+            end
+        end
+
+        if #Found == 0 then
+            Rayfield:Notify({
+                Title = "Plant Search",
+                Content = "No plant found.",
+                Duration = 2
+            })
+
+            return
+        end
+
+        for _, Plant in ipairs(Found) do
+            addSelection(
+                SelectedPlants,
+                Plant
+            )
+        end
+
+        if PlantDropdown then
+            PlantDropdown:Set(
+                SelectedPlants
+            )
+        end
+
+        Rayfield:Notify({
+            Title = "Plant Added",
+            Content = table.concat(
+                Found,
+                ", "
+            ),
+            Duration = 2
+        })
+    end
+})
+
+PlantDropdown = AutomaticallyTab:CreateDropdown({
+    Name = "Select Plants",
+    Options = ALL_PLANTS,
+    CurrentOption = {},
+    MultipleOptions = true,
+    Flag = "SelectedPlants",
+
+    Callback = function(Options)
+        SelectedPlants =
+            convertSelection(Options)
+    end
+})
+
+--============================================================
+-- SELECTED PLANTS
+--============================================================
+
+AutomaticallyTab:CreateToggle({
+    Name = "Auto Collect Selected Plants",
+    CurrentValue = false,
+    Flag = "AutoCollectSelected",
+
+    Callback = function(Value)
+        if Value then
+            if #SelectedPlants == 0 then
+                Rayfield:Notify({
+                    Title = "No Plants Selected",
+                    Content = "Select at least one plant.",
+                    Duration = 3
+                })
+
+                return
+            end
+
+            setAutoCollect(true, false)
+
+            Rayfield:Notify({
+                Title = "Auto Collect",
+                Content = "Collecting selected plants.",
+                Duration = 3
+            })
+        else
+            stopAutoCollect()
+
+            Rayfield:Notify({
+                Title = "Auto Collect",
+                Content = "Stopped.",
+                Duration = 2
+            })
+        end
+    end
+})
+
+--============================================================
+-- CLEAR FILTERS
+--============================================================
+
+AutomaticallyTab:CreateButton({
+    Name = "Clear All Selections",
+
+    Callback = function()
+        SelectedPlants = {}
+        SelectedMutations = {}
+
+        if PlantDropdown then
+            PlantDropdown:Set({})
+        end
+
+        if MutationDropdown then
+            MutationDropdown:Set({})
+        end
+
+        Rayfield:Notify({
+            Title = "Filters",
+            Content = "Selections cleared.",
+            Duration = 2
+        })
+    end
+})
+
+--============================================================
+-- SETTINGS
+--============================================================
 
 AutomaticallyTab:CreateSection("Settings")
 
 AutomaticallyTab:CreateSlider({
-    Name = "Radius (Studs)",
-    Range = {10, 500},
+    Name = "Collection Radius",
+    Range = {10, 1000},
     Increment = 10,
-    CurrentValue = collectionRadius,
+    Suffix = " studs",
+    CurrentValue = 100,
+    Flag = "CollectionRadius",
+
     Callback = function(Value)
-        collectionRadius = Value
-    end,
+        CollectionRadius = Value
+    end
 })
 
 AutomaticallyTab:CreateSlider({
     Name = "Collect Speed",
-    Range = {0.05, 2},
-    Increment = 0.05,
-    CurrentValue = collectCooldown,
+    Range = {0.01, 2},
+    Increment = 0.01,
+    Suffix = " sec",
+    CurrentValue = 0.1,
+    Flag = "CollectCooldown",
+
     Callback = function(Value)
-        collectCooldown = Value
-    end,
-})                       
+        CollectCooldown = Value
+    end
+})
+
+--============================================================
+-- CHARACTER RESPAWN SUPPORT
+--============================================================
+
+Player.CharacterAdded:Connect(function(Character)
+    Character:WaitForChild("Humanoid", 10)
+    Character:WaitForChild("HumanoidRootPart", 10)
+end)
+
+--============================================================
+-- END
+--============================================================
+
+print("[Dark Hub] Loaded successfully.")
 
 --//==================================================
 --// THEMES TAB
