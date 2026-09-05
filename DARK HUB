@@ -186,6 +186,46 @@ submitToggle = EventsTab:CreateToggle({
     end,
 })
 
+EventsTab:CreateSection("Honey Machine")
+
+local autoCollectHoney = false
+local collectHoneyInterval = 1 -- Time in seconds between collects
+
+EventsTab:CreateToggle({
+    Name = "Auto Collect Honey",
+    CurrentValue = false,
+    Flag = "AutoCollectHoneyFlag",
+    Callback = function(Value)
+        autoCollectHoney = Value
+
+        if Value then
+            Rayfield:Notify({
+                Title = "Auto Collect Honey",
+                Content = "Started collecting honey.",
+                Duration = 3,
+            })
+
+            task.spawn(function()
+                while autoCollectHoney do
+                    local gameEvents = ReplicatedStorage:FindFirstChild("GameEvents")
+                    local honeyEvent = gameEvents and gameEvents:FindFirstChild("HoneyMachine2026Service_RE")
+
+                    if honeyEvent and honeyEvent:IsA("RemoteEvent") then
+                        honeyEvent:FireServer("CollectHoney")
+                    end
+
+                    task.wait(collectHoneyInterval)
+                end
+            end)
+        else
+            Rayfield:Notify({
+                Title = "Auto Collect Honey",
+                Content = "Stopped collecting honey.",
+                Duration = 3,
+            })
+        end
+    end,
+})
 
 --//==================================================
 --// SHOP TAB (BEANSTALK EVENT SHOP)
