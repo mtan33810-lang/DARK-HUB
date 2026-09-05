@@ -263,6 +263,33 @@ EventsTab:CreateToggle({
     end,
 })
 
+EventsTab:CreateSection("🐝Bizzy Bee")
+
+local autoSubmit = false
+local submitInterval = 5 -- seconds
+
+local submitToggle
+submitToggle = EventsTab:CreateToggle({
+    Name = "Auto Submit All (Bizzy Bee)",
+    CurrentValue = false,
+    Flag = "AutoSubmitBizzyBee",
+    Callback = function(Value)
+        autoSubmit = Value
+        if Value then
+            spawn(function()
+                while autoSubmit do
+                    local honeyEvent = game:GetService("ReplicatedStorage").GameEvents.HoneyMachine2026Service_RE
+                    if honeyEvent then
+                        honeyEvent:FireServer("SubmitAll")
+                    end
+                    wait(submitInterval)
+                end
+            end)
+        end
+    end,
+})
+
+
 --//==================================================
 --// SHOP TAB (BEANSTALK EVENT SHOP)
 --//==================================================
