@@ -57,7 +57,7 @@ local Player = Players.LocalPlayer
 local MainTab = Window:CreateTab("Home", 4483362458)
 local EventsTab = Window:CreateTab("Event", 4483362458)
 local ShopTab = Window:CreateTab("Shop", 4483362458)
-local AutomaticallyTab = Window:CreateTab("Auto Collect", 4483362458)
+local AutomaticallyTab = Window:CreateTab("Automatically", 4483362458)
 local ThemeTab = Window:CreateTab("Themes", 4483362458)
 
 --============================================================
