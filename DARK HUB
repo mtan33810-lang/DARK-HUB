@@ -1,7 +1,6 @@
 --============================================================
 -- DARK HUB
 -- Clean Rayfield LocalScript
--- Intended for your own Roblox Studio game
 --============================================================
 
 --============================================================
@@ -41,7 +40,7 @@ local Window = Rayfield:CreateWindow({
 })
 
 --============================================================
--- SERVICES
+-- SERVICES & VARIABLES
 --============================================================
 
 local Players = game:GetService("Players")
@@ -81,84 +80,65 @@ end
 
 local function getHumanoid()
     local Character = getCharacter()
-
-    if not Character then
-        return nil
-    end
-
+    if not Character then return nil end
     return Character:FindFirstChildOfClass("Humanoid")
 end
 
 local function getRootPart()
     local Character = getCharacter()
-
-    if not Character then
-        return nil
-    end
-
+    if not Character then return nil end
     return Character:FindFirstChild("HumanoidRootPart")
 end
 
 --============================================================
--- HOME
+-- MAIN TAB (HOME)
 --============================================================
 
-HomeTab:CreateSection("Movement")
+MainTab:CreateSection("Movement")
 
 local InfiniteJump = false
 
-HomeTab:CreateToggle({
+MainTab:CreateToggle({
     Name = "Infinite Jump",
     CurrentValue = false,
     Flag = "InfiniteJump",
-
     Callback = function(Value)
         InfiniteJump = Value
     end
 })
 
 UserInputService.JumpRequest:Connect(function()
-    if not InfiniteJump then
-        return
-    end
-
+    if not InfiniteJump then return end
     local Humanoid = getHumanoid()
-
     if Humanoid then
-        Humanoid:ChangeState(
-            Enum.HumanoidStateType.Jumping
-        )
+        Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
     end
 end)
 
-HomeTab:CreateSlider({
+MainTab:CreateSlider({
     Name = "WalkSpeed",
     Range = {0, 300},
     Increment = 1,
     Suffix = " Speed",
     CurrentValue = 16,
     Flag = "WalkSpeed",
-
     Callback = function(Value)
         local Humanoid = getHumanoid()
-
         if Humanoid then
             Humanoid.WalkSpeed = Value
         end
     end
 })
 
-HomeTab:CreateSlider({
+MainTab:CreateSlider({
     Name = "Jump Height",
     Range = {0, 300},
     Increment = 1,
     Suffix = " Height",
     CurrentValue = 7.2,
     Flag = "JumpHeight",
-
     Callback = function(Value)
         local Humanoid = getHumanoid()
-
         if Humanoid then
             Humanoid.UseJumpPower = false
             Humanoid.JumpHeight = Value
@@ -166,9 +146,9 @@ HomeTab:CreateSlider({
     end
 })
 
---//==================================================
---// EVENT TAB
---//==================================================
+--============================================================
+-- EVENT TAB
+--============================================================
 
 EventsTab:CreateSection("Beanstalk Event")
 
@@ -181,14 +161,16 @@ EventsTab:CreateToggle({
         if Value then
             task.spawn(function()
                 while getgenv().AutoSubmitBeanstalk do
-                    local eventFolder = ReplicatedStorage:FindFirstChild("GameEvents")
-                    local event = eventFolder and eventFolder:FindFirstChild("Events") 
-                        and eventFolder.Events:FindFirstChild("BeanstalkEvent") 
-                        and eventFolder.Events.BeanstalkEvent:FindFirstChild("BeanstalkRESubmitAllPlant")
-                    
-                    if event then
-                        event:FireServer()
-                    end
+                    pcall(function()
+                        local eventFolder = ReplicatedStorage:FindFirstChild("GameEvents")
+                        local event = eventFolder and eventFolder:FindFirstChild("Events") 
+                            and eventFolder.Events:FindFirstChild("BeanstalkEvent") 
+                            and eventFolder.Events.BeanstalkEvent:FindFirstChild("BeanstalkRESubmitAllPlant")
+                        
+                        if event then
+                            event:FireServer()
+                        end
+                    end)
                     task.wait(10)
                 end
             end)
@@ -196,26 +178,27 @@ EventsTab:CreateToggle({
     end,
 })
 
-EventsTab:CreateSection("🐝Bizzy Bee")
+EventsTab:CreateSection("🐝 Bizzy Bee")
 
-local autoSubmit = false
-local submitInterval = 5 -- seconds
+local autoSubmitBizzy = false
+local submitInterval = 5
 
-local submitToggle
-submitToggle = EventsTab:CreateToggle({
+EventsTab:CreateToggle({
     Name = "Auto Submit All (Bizzy Bee)",
     CurrentValue = false,
     Flag = "AutoSubmitBizzyBee",
     Callback = function(Value)
-        autoSubmit = Value
+        autoSubmitBizzy = Value
         if Value then
-            spawn(function()
-                while autoSubmit do
-                    local honeyEvent = game:GetService("ReplicatedStorage").GameEvents.HoneyMachine2026Service_RE
-                    if honeyEvent then
-                        honeyEvent:FireServer("SubmitAll")
-                    end
-                    wait(submitInterval)
+            task.spawn(function()
+                while autoSubmitBizzy do
+                    pcall(function()
+                        local honeyEvent = ReplicatedStorage:FindFirstChild("GameEvents") and ReplicatedStorage.GameEvents:FindFirstChild("HoneyMachine2026Service_RE")
+                        if honeyEvent then
+                            honeyEvent:FireServer("SubmitAll")
+                        end
+                    end)
+                    task.wait(submitInterval)
                 end
             end)
         end
@@ -225,7 +208,7 @@ submitToggle = EventsTab:CreateToggle({
 EventsTab:CreateSection("Honey Machine")
 
 local autoCollectHoney = false
-local collectHoneyInterval = 1 -- Time in seconds between collects
+local collectHoneyInterval = 1
 
 EventsTab:CreateToggle({
     Name = "Auto Collect Honey",
@@ -233,7 +216,6 @@ EventsTab:CreateToggle({
     Flag = "AutoCollectHoneyFlag",
     Callback = function(Value)
         autoCollectHoney = Value
-
         if Value then
             Rayfield:Notify({
                 Title = "Auto Collect Honey",
@@ -243,13 +225,14 @@ EventsTab:CreateToggle({
 
             task.spawn(function()
                 while autoCollectHoney do
-                    local gameEvents = ReplicatedStorage:FindFirstChild("GameEvents")
-                    local honeyEvent = gameEvents and gameEvents:FindFirstChild("HoneyMachine2026Service_RE")
+                    pcall(function()
+                        local gameEvents = ReplicatedStorage:FindFirstChild("GameEvents")
+                        local honeyEvent = gameEvents and gameEvents:FindFirstChild("HoneyMachine2026Service_RE")
 
-                    if honeyEvent and honeyEvent:IsA("RemoteEvent") then
-                        honeyEvent:FireServer("CollectHoney")
-                    end
-
+                        if honeyEvent and honeyEvent:IsA("RemoteEvent") then
+                            honeyEvent:FireServer("CollectHoney")
+                        end
+                    end)
                     task.wait(collectHoneyInterval)
                 end
             end)
@@ -263,15 +246,9 @@ EventsTab:CreateToggle({
     end,
 })
 
---//==================================================
---// SHOP TAB (BEANSTALK EVENT SHOP)
---//==================================================
-
 EventsTab:CreateSection("Honey Seed Shop")
 
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-
-local seedOptions = {
+local honeySeedOptions = {
     "Honey Carrot", "Honey Strawberry", "Honey Blueberry", "Honey Buttercup",
     "Honey Orange Tulip", "Honey Corn", "Honey Daffodil", "Honey Tomato",
     "Honey Apple", "Honey Bamboo", "Honey Pumpkin", "Honey Watermelon",
@@ -283,103 +260,69 @@ local seedOptions = {
     "Honey Romanesco", "Honey Zebrazinkle"
 }
 
-local selectedSeeds = {}
-local autoBuySeeds = false
-local buyDelay = 1
+local selectedHoneySeeds = {}
+local autoBuyHoneySeeds = false
 
 EventsTab:CreateDropdown({
     Name = "Select Seeds to Auto Buy",
-    Options = seedOptions,
+    Options = honeySeedOptions,
     CurrentOption = {},
     MultipleOptions = true,
-    Flag = "SeedMultiDropdownFlag",
+    Flag = "EventSeedDropdownFlag",
     Callback = function(Options)
-        selectedSeeds = typeof(Options) == "table" and Options or {Options}
+        selectedHoneySeeds = typeof(Options) == "table" and Options or {Options}
     end,
 })
 
 EventsTab:CreateToggle({
     Name = "Auto Buy Seeds",
     CurrentValue = false,
-    Flag = "AutoBuySeedsFlag",
+    Flag = "AutoBuyHoneySeedsFlag",
     Callback = function(Value)
-        autoBuySeeds = Value
+        autoBuyHoneySeeds = Value
 
         if Value then
-            Rayfield:Notify({
-                Title = "Auto Buy Seeds",
-                Content = "Started auto-buying seeds.",
-                Duration = 3,
-            })
-
             task.spawn(function()
-                while autoBuySeeds do
-                    if selectedSeeds and #selectedSeeds > 0 then
-                        local gameEvents = ReplicatedStorage:FindFirstChild("GameEvents")
-                        local buyEvent = gameEvents and gameEvents:FindFirstChild("BuyEventShopStock")
+                while autoBuyHoneySeeds do
+                    if selectedHoneySeeds and #selectedHoneySeeds > 0 then
+                        pcall(function()
+                            local gameEvents = ReplicatedStorage:FindFirstChild("GameEvents")
+                            local buyEvent = gameEvents and gameEvents:FindFirstChild("BuyEventShopStock")
 
-                        if buyEvent and buyEvent:IsA("RemoteEvent") then
-                            for _, seed in ipairs(selectedSeeds) do
-                                if not autoBuySeeds then break end
-                                buyEvent:FireServer(seed, "Honey Seed Shop")
+                            if buyEvent and buyEvent:IsA("RemoteEvent") then
+                                for _, seed in ipairs(selectedHoneySeeds) do
+                                    if not autoBuyHoneySeeds then break end
+                                    buyEvent:FireServer(seed, "Honey Seed Shop")
+                                end
                             end
-                        end
+                        end)
                     end
-                    task.wait(buyDelay)
+                    task.wait(1)
                 end
             end)
-        else
-            Rayfield:Notify({
-                Title = "Auto Buy Seeds",
-                Content = "Stopped auto-buying.",
-                Duration = 3,
-            })
         end
     end,
 })
 
 EventsTab:CreateSection("Honey Coin Shop")
 
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-
-local shopOptions = {
-    "Honey Honey Daisy",
-    "Honey Honey Dew",
-    "Honey Hive Seed Pack",
-    "Honey Ambercomb",
-    "Pollen Radar 2026",
-    "Honey Coneflower",
-    "Hive Egg",
-    "Hive Crate",
-    "Professor Bee",
-    "Honey Badger",
-    "Honey Birds of Paradise",
-    "Honey Honey Hollow"
+local coinShopOptions = {
+    "Honey Honey Daisy", "Honey Honey Dew", "Honey Hive Seed Pack", "Honey Ambercomb",
+    "Pollen Radar 2026", "Honey Coneflower", "Hive Egg", "Hive Crate",
+    "Professor Bee", "Honey Badger", "Honey Birds of Paradise", "Honey Honey Hollow"
 }
 
 local selectedShopItems = {}
 local autoBuyShopItems = false
-local shopBuyDelay = 1
 
 EventsTab:CreateDropdown({
     Name = "Select Items to Auto Buy",
-    Options = shopOptions,
+    Options = coinShopOptions,
     CurrentOption = {},
     MultipleOptions = true,
     Flag = "CoinShopMultiDropdownFlag",
     Callback = function(Options)
-        selectedShopItems = {}
-        if typeof(Options) == "table" then
-            for key, value in pairs(Options) do
-                if typeof(value) == "string" then
-                    table.insert(selectedShopItems, value)
-                elseif value == true and typeof(key) == "string" then
-                    table.insert(selectedShopItems, key)
-                end
-            end
-        elseif typeof(Options) == "string" then
-            table.insert(selectedShopItems, Options)
-        end
+        selectedShopItems = typeof(Options) == "table" and Options or {Options}
     end,
 })
 
@@ -391,73 +334,46 @@ EventsTab:CreateToggle({
         autoBuyShopItems = Value
 
         if Value then
-            Rayfield:Notify({
-                Title = "Auto Buy Coin Shop",
-                Content = "Started auto-buying shop items.",
-                Duration = 3,
-            })
-
             task.spawn(function()
                 while autoBuyShopItems do
                     if #selectedShopItems > 0 then
-                        local gameEvents = ReplicatedStorage:FindFirstChild("GameEvents")
-                        local buyEvent = gameEvents and gameEvents:FindFirstChild("BuyEventShopStock")
+                        pcall(function()
+                            local gameEvents = ReplicatedStorage:FindFirstChild("GameEvents")
+                            local buyEvent = gameEvents and gameEvents:FindFirstChild("BuyEventShopStock")
 
-                        if buyEvent and buyEvent:IsA("RemoteEvent") then
-                            for _, itemName in ipairs(selectedShopItems) do
-                                if not autoBuyShopItems then break end
-                                buyEvent:FireServer(itemName, "Honey Coin Shop")
+                            if buyEvent and buyEvent:IsA("RemoteEvent") then
+                                for _, itemName in ipairs(selectedShopItems) do
+                                    if not autoBuyShopItems then break end
+                                    buyEvent:FireServer(itemName, "Honey Coin Shop")
+                                end
                             end
-                        end
+                        end)
                     end
-                    task.wait(shopBuyDelay)
+                    task.wait(1)
                 end
             end)
-        else
-            Rayfield:Notify({
-                Title = "Auto Buy Coin Shop",
-                Content = "Stopped auto-buying shop items.",
-                Duration = 3,
-            })
         end
     end,
 })
 
 EventsTab:CreateSection("Royal Jelly Shop")
 
-local shopOptions = {
-    "Pollen Puffball",
-    "Grape Droplet",
-    "Carpenter Bee",
-    "Pet Shard RoyalJelly",
-    "Royal Jelly Fountain",
-    "King Bee",
-    "Pohutukawa",
+local royalJellyOptions = {
+    "Pollen Puffball", "Grape Droplet", "Carpenter Bee",
+    "Pet Shard RoyalJelly", "Royal Jelly Fountain", "King Bee", "Pohutukawa"
 }
 
 local selectedRoyalJellyItems = {}
 local autoBuyRoyalJelly = false
-local royalJellyBuyDelay = 1
 
 EventsTab:CreateDropdown({
     Name = "Select Royal Jelly Shop Items",
-    Options = shopOptions,
+    Options = royalJellyOptions,
     CurrentOption = {},
     MultipleOptions = true,
     Flag = "RoyalJellyShopMultiDropdownFlag",
     Callback = function(Options)
-        selectedRoyalJellyItems = {}
-        if typeof(Options) == "table" then
-            for key, value in pairs(Options) do
-                if typeof(value) == "string" then
-                    table.insert(selectedRoyalJellyItems, value)
-                elseif value == true and typeof(key) == "string" then
-                    table.insert(selectedRoyalJellyItems, key)
-                end
-            end
-        elseif typeof(Options) == "string" then
-            table.insert(selectedRoyalJellyItems, Options)
-        end
+        selectedRoyalJellyItems = typeof(Options) == "table" and Options or {Options}
     end,
 })
 
@@ -469,70 +385,45 @@ EventsTab:CreateToggle({
         autoBuyRoyalJelly = Value
 
         if Value then
-            Rayfield:Notify({
-                Title = "Royal Jelly Shop",
-                Content = "Started auto-buying items.",
-                Duration = 3,
-            })
-
             task.spawn(function()
                 while autoBuyRoyalJelly do
                     if #selectedRoyalJellyItems > 0 then
-                        local gameEvents = ReplicatedStorage:FindFirstChild("GameEvents")
-                        local buyEvent = gameEvents and gameEvents:FindFirstChild("BuyEventShopStock")
+                        pcall(function()
+                            local gameEvents = ReplicatedStorage:FindFirstChild("GameEvents")
+                            local buyEvent = gameEvents and gameEvents:FindFirstChild("BuyEventShopStock")
 
-                        if buyEvent and buyEvent:IsA("RemoteEvent") then
-                            for _, itemName in ipairs(selectedRoyalJellyItems) do
-                                if not autoBuyRoyalJelly then break end
-                                buyEvent:FireServer(itemName, "Royal Jelly Shop")
+                            if buyEvent and buyEvent:IsA("RemoteEvent") then
+                                for _, itemName in ipairs(selectedRoyalJellyItems) do
+                                    if not autoBuyRoyalJelly then break end
+                                    buyEvent:FireServer(itemName, "Royal Jelly Shop")
+                                end
                             end
-                        end
+                        end)
                     end
-                    task.wait(royalJellyBuyDelay)
+                    task.wait(1)
                 end
             end)
-        else
-            Rayfield:Notify({
-                Title = "Royal Jelly Shop",
-                Content = "Stopped auto-buying.",
-                Duration = 3,
-            })
         end
     end,
 })
 
 EventsTab:CreateSection("Bee Egg Shop")
 
-local eggOptions = {
-    "Common Bee Egg",
-    "Rare Bee Egg",
-    "Mythical Bee Egg",
-    "Transcendent Bee Egg"
+local beeEggOptions = {
+    "Common Bee Egg", "Rare Bee Egg", "Mythical Bee Egg", "Transcendent Bee Egg"
 }
 
-local selectedEggs = {}
-local autoBuyEggs = false
-local eggBuyDelay = 1
+local selectedBeeEggs = {}
+local autoBuyBeeEggs = false
 
 EventsTab:CreateDropdown({
     Name = "Select Eggs to Auto Buy",
-    Options = eggOptions,
+    Options = beeEggOptions,
     CurrentOption = {},
     MultipleOptions = true,
     Flag = "BeeEggShopMultiDropdownFlag",
     Callback = function(Options)
-        selectedEggs = {}
-        if typeof(Options) == "table" then
-            for key, value in pairs(Options) do
-                if typeof(value) == "string" then
-                    table.insert(selectedEggs, value)
-                elseif value == true and typeof(key) == "string" then
-                    table.insert(selectedEggs, key)
-                end
-            end
-        elseif typeof(Options) == "string" then
-            table.insert(selectedEggs, Options)
-        end
+        selectedBeeEggs = typeof(Options) == "table" and Options or {Options}
     end,
 })
 
@@ -541,53 +432,39 @@ EventsTab:CreateToggle({
     CurrentValue = false,
     Flag = "AutoBuyBeeEggsFlag",
     Callback = function(Value)
-        autoBuyEggs = Value
+        autoBuyBeeEggs = Value
 
         if Value then
-            Rayfield:Notify({
-                Title = "Bee Egg Shop",
-                Content = "Started auto-buying eggs.",
-                Duration = 3,
-            })
-
             task.spawn(function()
-                while autoBuyEggs do
-                    if #selectedEggs > 0 then
-                        local gameEvents = ReplicatedStorage:FindFirstChild("GameEvents")
-                        local eggShopService = gameEvents and gameEvents:FindFirstChild("BeeColonyEggShopService")
-                        local buyEggFunc = eggShopService and eggShopService:FindFirstChild("BuyBeeEggStock")
+                while autoBuyBeeEggs do
+                    if #selectedBeeEggs > 0 then
+                        pcall(function()
+                            local gameEvents = ReplicatedStorage:FindFirstChild("GameEvents")
+                            local eggShopService = gameEvents and gameEvents:FindFirstChild("BeeColonyEggShopService")
+                            local buyEggFunc = eggShopService and eggShopService:FindFirstChild("BuyBeeEggStock")
 
-                        if buyEggFunc and buyEggFunc:IsA("RemoteFunction") then
-                            for _, eggName in ipairs(selectedEggs) do
-                                if not autoBuyEggs then break end
-                                -- Pcall protects the script from stopping if the function yields or errors (e.g. not enough coins)
-                                pcall(function()
+                            if buyEggFunc and buyEggFunc:IsA("RemoteFunction") then
+                                for _, eggName in ipairs(selectedBeeEggs) do
+                                    if not autoBuyBeeEggs then break end
                                     buyEggFunc:InvokeServer(eggName)
-                                end)
+                                end
                             end
-                        end
+                        end)
                     end
-                    task.wait(eggBuyDelay)
+                    task.wait(1)
                 end
             end)
-        else
-            Rayfield:Notify({
-                Title = "Bee Egg Shop",
-                Content = "Stopped auto-buying eggs.",
-                Duration = 3,
-            })
         end
     end,
 })
 
---//==================================================
---// SHOP TAB
---//==================================================
+--============================================================
+-- SHOP TAB
+--============================================================
 
--- Seeds Section
 ShopTab:CreateSection("Seed Shop")
 
-local seedOptions = {
+local standardSeedOptions = {
     "Carrot", "Strawberry", "Blueberry", "Buttercup", "Orange Tulip", "Corn",
     "Daffodil", "Tomato", "Apple", "Bamboo", "Pumpkin", "Watermelon", "Cactus",
     "Coconut", "Dragon Fruit", "Mango", "Cacao", "Grape", "Mushroom", "Pepper",
@@ -596,46 +473,46 @@ local seedOptions = {
     "Moongrain Meadow", "Octobloom", "Romanesco", "Zebrazinkle"
 }
 
-local selectedSeeds = {}
-local autoBuySeeds = false
+local selectedStandardSeeds = {}
+local autoBuyStandardSeeds = false
 
 ShopTab:CreateDropdown({
     Name = "Select Seeds to Auto Buy",
-    Options = seedOptions,
+    Options = standardSeedOptions,
     CurrentOption = {},
     MultipleOptions = true,
-    Flag = "SeedMultiDropdownFlag",
+    Flag = "StandardSeedMultiDropdownFlag",
     Callback = function(Options)
-        selectedSeeds = Options
+        selectedStandardSeeds = typeof(Options) == "table" and Options or {Options}
     end,
 })
 
 ShopTab:CreateToggle({
     Name = "Auto Buy Seeds",
     CurrentValue = false,
-    Flag = "AutoBuySeedsFlag",
+    Flag = "AutoBuyStandardSeedsFlag",
     Callback = function(Value)
-        autoBuySeeds = Value
+        autoBuyStandardSeeds = Value
     end,
 })
 
 task.spawn(function()
     while true do
-        if autoBuySeeds and #selectedSeeds > 0 then
-            local seedRemote = ReplicatedStorage:FindFirstChild("GameEvents") and ReplicatedStorage.GameEvents:FindFirstChild("BuySeedStock")
-            if seedRemote then
-                for _, seedName in ipairs(selectedSeeds) do
-                    pcall(function()
+        if autoBuyStandardSeeds and #selectedStandardSeeds > 0 then
+            pcall(function()
+                local seedRemote = ReplicatedStorage:FindFirstChild("GameEvents") and ReplicatedStorage.GameEvents:FindFirstChild("BuySeedStock")
+                if seedRemote then
+                    for _, seedName in ipairs(selectedStandardSeeds) do
+                        if not autoBuyStandardSeeds then break end
                         seedRemote:FireServer("Shop", seedName)
-                    end)
+                    end
                 end
-            end
+            end)
         end
         task.wait(1)
     end
 end)
 
--- Gear Section
 ShopTab:CreateSection("Gear Shop")
 
 local gearOptions = {
@@ -655,7 +532,7 @@ ShopTab:CreateDropdown({
     MultipleOptions = true,
     Flag = "GearMultiDropdownFlag",
     Callback = function(Options)
-        selectedGears = Options
+        selectedGears = typeof(Options) == "table" and Options or {Options}
     end,
 })
 
@@ -671,20 +548,20 @@ ShopTab:CreateToggle({
 task.spawn(function()
     while true do
         if autoBuyGears and #selectedGears > 0 then
-            local buyRemote = ReplicatedStorage:FindFirstChild("GameEvents") and ReplicatedStorage.GameEvents:FindFirstChild("BuyGearStock")
-            if buyRemote then
-                for _, gearName in ipairs(selectedGears) do
-                    pcall(function()
+            pcall(function()
+                local buyRemote = ReplicatedStorage:FindFirstChild("GameEvents") and ReplicatedStorage.GameEvents:FindFirstChild("BuyGearStock")
+                if buyRemote then
+                    for _, gearName in ipairs(selectedGears) do
+                        if not autoBuyGears then break end
                         buyRemote:FireServer(gearName)
-                    end)
+                    end
                 end
-            end
+            end)
         end
         task.wait(1)
     end
 end)
 
--- Egg Section
 ShopTab:CreateSection("Egg Shop")
 
 local eggOptions = {
@@ -702,7 +579,7 @@ ShopTab:CreateDropdown({
     MultipleOptions = true,
     Flag = "EggMultiDropdownFlag",
     Callback = function(Options)
-        selectedEggs = Options
+        selectedEggs = typeof(Options) == "table" and Options or {Options}
     end,
 })
 
@@ -718,21 +595,22 @@ ShopTab:CreateToggle({
 task.spawn(function()
     while true do
         if autoBuyEggs and #selectedEggs > 0 then
-            local eggRemote = ReplicatedStorage:FindFirstChild("GameEvents") and ReplicatedStorage.GameEvents:FindFirstChild("BuyPetEgg")
-            if eggRemote then
-                for _, eggType in ipairs(selectedEggs) do
-                    pcall(function()
+            pcall(function()
+                local eggRemote = ReplicatedStorage:FindFirstChild("GameEvents") and ReplicatedStorage.GameEvents:FindFirstChild("BuyPetEgg")
+                if eggRemote then
+                    for _, eggType in ipairs(selectedEggs) do
+                        if not autoBuyEggs then break end
                         eggRemote:FireServer(eggType)
-                    end)
+                    end
                 end
-            end
+            end)
         end
         task.wait(1)
     end
 end)
 
 --============================================================
--- AUTO COLLECT SETTINGS
+-- AUTO COLLECT SETTINGS & HELPERS
 --============================================================
 
 local AutoCollectEnabled = false
@@ -744,86 +622,27 @@ local SelectedMutations = {}
 
 local CollectionRadius = 100
 local CollectCooldown = 0.1
-
 local CollectLoopRunning = false
 
---============================================================
--- PLANTS
---============================================================
-
 local ALL_PLANTS = {
-    "Apple",
-    "Coconut",
-    "Banana",
-    "Mango",
-    "Dragon Fruit",
-    "Sugar Apple",
-    "Alien Apple",
-    "Elder Strawberry",
-
-    "Carrot",
-    "Tomato",
-    "Corn",
-    "Pumpkin",
-    "Watermelon",
-    "Bamboo",
-    "Cactus",
-    "Pepper",
-    "Romanesco",
-
-    "Strawberry",
-    "Blueberry",
-    "Grape",
-    "Moongrain Meadow",
-    "Daisy",
-    "Honey Dew",
-
-    "Buttercup",
-    "Orange Tulip",
-    "Daffodil",
-    "Sunflower",
-    "Burning Bud",
-    "Ember Lily",
-    "Crimson Thorn",
-    "Octobloom",
-
-    "Mushroom",
-    "Cacao",
-    "Giant Pinecone",
-    "Zebrazinkle",
-    "Coneflower",
-    "Birds of Paradise",
-    "Hollow"
+    "Apple", "Coconut", "Banana", "Mango", "Dragon Fruit", "Sugar Apple",
+    "Alien Apple", "Elder Strawberry", "Carrot", "Tomato", "Corn", "Pumpkin",
+    "Watermelon", "Bamboo", "Cactus", "Pepper", "Romanesco", "Strawberry",
+    "Blueberry", "Grape", "Moongrain Meadow", "Daisy", "Honey Dew", "Buttercup",
+    "Orange Tulip", "Daffodil", "Sunflower", "Burning Bud", "Ember Lily",
+    "Crimson Thorn", "Octobloom", "Mushroom", "Cacao", "Giant Pinecone",
+    "Zebrazinkle", "Coneflower", "Birds of Paradise", "Hollow"
 }
-
---============================================================
--- MUTATIONS
---============================================================
 
 local ALL_MUTATIONS = {
-    "Golden",
-    "Rainbow",
-    "Shiny",
-    "Giant",
-    "Mutated",
-    "Mega",
-    "Corrupted",
-    "Glowing",
-    "Frozen",
-    "Radiant"
+    "Golden", "Rainbow", "Shiny", "Giant", "Mutated",
+    "Mega", "Corrupted", "Glowing", "Frozen", "Radiant"
 }
-
---============================================================
--- SELECTION HELPERS
---============================================================
 
 local function contains(List, Value)
     for _, Item in ipairs(List) do
-        if Item == Value then
-            return true
-        end
+        if Item == Value then return true end
     end
-
     return false
 end
 
@@ -835,170 +654,87 @@ end
 
 local function convertSelection(Value)
     local Result = {}
-
     if typeof(Value) == "string" then
         table.insert(Result, Value)
         return Result
     end
-
-    if typeof(Value) ~= "table" then
-        return Result
-    end
+    if typeof(Value) ~= "table" then return Result end
 
     for Key, Item in pairs(Value) do
         if typeof(Item) == "string" then
             table.insert(Result, Item)
-
         elseif Item == true and typeof(Key) == "string" then
             table.insert(Result, Key)
         end
     end
-
     return Result
 end
 
---============================================================
--- MATCHING
---============================================================
-
 local function matchesPlant(Name)
-    if AutoCollectAll then
-        return true
-    end
-
-    if #SelectedPlants == 0 then
-        return false
-    end
+    if AutoCollectAll then return true end
+    if #SelectedPlants == 0 then return false end
 
     local LowerName = Name:lower()
-
     for _, Plant in ipairs(SelectedPlants) do
-        if LowerName:find(
-            Plant:lower(),
-            1,
-            true
-        ) then
+        if LowerName:find(Plant:lower(), 1, true) then
             return true
         end
     end
-
     return false
 end
 
 local function matchesMutation(Name)
-    if not MutationOnly then
-        return true
-    end
-
+    if not MutationOnly then return true end
     local LowerName = Name:lower()
 
     if #SelectedMutations > 0 then
         for _, Mutation in ipairs(SelectedMutations) do
-            if LowerName:find(
-                Mutation:lower(),
-                1,
-                true
-            ) then
+            if LowerName:find(Mutation:lower(), 1, true) then
                 return true
             end
         end
-
         return false
     end
 
     for _, Mutation in ipairs(ALL_MUTATIONS) do
-        if LowerName:find(
-            Mutation:lower(),
-            1,
-            true
-        ) then
+        if LowerName:find(Mutation:lower(), 1, true) then
             return true
         end
     end
-
     return false
 end
 
---============================================================
--- OBJECT POSITION
---============================================================
-
 local function getObjectPosition(Object)
-    if not Object then
-        return nil
-    end
-
-    if Object:IsA("BasePart") then
-        return Object.Position
-    end
-
+    if not Object then return nil end
+    if Object:IsA("BasePart") then return Object.Position end
     if Object:IsA("Model") then
-        if Object.PrimaryPart then
-            return Object.PrimaryPart.Position
-        end
-
+        if Object.PrimaryPart then return Object.PrimaryPart.Position end
         return Object:GetPivot().Position
     end
-
     return nil
 end
-
---============================================================
--- FARM
---============================================================
 
 local function getFarm()
     return Workspace:FindFirstChild("Farm", true)
 end
 
---============================================================
--- COLLECT REMOTE
---============================================================
-
--- This should point to a RemoteEvent belonging to YOUR game.
--- The server should validate ownership, distance, item state,
--- cooldowns, and whether the plant can actually be collected.
-
 local function getCollectRemote()
     local GameEvents = ReplicatedStorage:FindFirstChild("GameEvents")
-
-    if not GameEvents then
-        return nil
-    end
-
-    local Crops = GameEvents:FindFirstChild("Crops")
-
-    if not Crops then
-        return nil
-    end
-
-    local Collect = Crops:FindFirstChild("Collect")
+    local Crops = GameEvents and GameEvents:FindFirstChild("Crops")
+    local Collect = Crops and Crops:FindFirstChild("Collect")
 
     if Collect and Collect:IsA("RemoteEvent") then
         return Collect
     end
-
     return nil
 end
 
---============================================================
--- FIND NEARBY PLANTS
---============================================================
-
 local function getNearbyPlants()
     local Results = {}
-
     local RootPart = getRootPart()
-
-    if not RootPart then
-        return Results
-    end
-
     local Farm = getFarm()
 
-    if not Farm then
-        return Results
-    end
+    if not RootPart or not Farm then return Results end
 
     local Origin = RootPart.Position
     local Seen = {}
@@ -1006,97 +742,48 @@ local function getNearbyPlants()
     for _, Object in ipairs(Farm:GetDescendants()) do
         if Object:IsA("Model") and not Seen[Object] then
             Seen[Object] = true
-
             local Name = Object.Name
 
-            if matchesPlant(Name)
-                and matchesMutation(Name) then
-
-                local Position =
-                    getObjectPosition(Object)
-
+            if matchesPlant(Name) and matchesMutation(Name) then
+                local Position = getObjectPosition(Object)
                 if Position then
-                    local Distance =
-                        (Position - Origin).Magnitude
-
+                    local Distance = (Position - Origin).Magnitude
                     if Distance <= CollectionRadius then
-                        table.insert(
-                            Results,
-                            Object
-                        )
+                        table.insert(Results, Object)
                     end
                 end
             end
         end
     end
-
     return Results
 end
 
---============================================================
--- COLLECT ONE PLANT
---============================================================
-
 local function collectPlant(Plant)
-    if not Plant then
-        return false
-    end
-
-    if not Plant.Parent then
-        return false
-    end
-
+    if not Plant or not Plant.Parent then return false end
     local CollectRemote = getCollectRemote()
+    if not CollectRemote then return false end
 
-    if not CollectRemote then
-        return false
-    end
-
-    local Success = pcall(function()
-        -- Match this argument format to YOUR server API.
-        CollectRemote:FireServer({
-            Plant
-        })
+    return pcall(function()
+        CollectRemote:FireServer({ Plant })
     end)
-
-    return Success
 end
 
---============================================================
--- AUTO COLLECT LOOP
---============================================================
-
 local function startAutoCollect()
-    if CollectLoopRunning then
-        return
-    end
-
+    if CollectLoopRunning then return end
     CollectLoopRunning = true
 
     task.spawn(function()
         while AutoCollectEnabled do
             local Plants = getNearbyPlants()
-
             for _, Plant in ipairs(Plants) do
-                if not AutoCollectEnabled then
-                    break
-                end
-
+                if not AutoCollectEnabled then break end
                 if Plant and Plant.Parent then
                     collectPlant(Plant)
                 end
-
-                task.wait(
-                    math.max(
-                        CollectCooldown,
-                        0.01
-                    )
-                )
+                task.wait(math.max(CollectCooldown, 0.01))
             end
-
             task.wait(0.2)
         end
-
         CollectLoopRunning = false
     end)
 end
@@ -1108,7 +795,6 @@ end
 local function setAutoCollect(Value, AllMode)
     AutoCollectEnabled = Value
     AutoCollectAll = AllMode
-
     if Value then
         startAutoCollect()
     end
@@ -1124,32 +810,17 @@ AutomaticallyTab:CreateToggle({
     Name = "Auto Collect ALL Plants",
     CurrentValue = false,
     Flag = "AutoCollectAll",
-
     Callback = function(Value)
         if Value then
             setAutoCollect(true, true)
-
-            Rayfield:Notify({
-                Title = "Auto Collect",
-                Content = "Collecting nearby plants.",
-                Duration = 3
-            })
+            Rayfield:Notify({ Title = "Auto Collect", Content = "Collecting nearby plants.", Duration = 3 })
         else
             AutoCollectAll = false
             stopAutoCollect()
-
-            Rayfield:Notify({
-                Title = "Auto Collect",
-                Content = "Stopped.",
-                Duration = 2
-            })
+            Rayfield:Notify({ Title = "Auto Collect", Content = "Stopped.", Duration = 2 })
         end
     end
 })
-
---============================================================
--- MUTATION FILTER
---============================================================
 
 AutomaticallyTab:CreateSection("Mutation Filter")
 
@@ -1157,7 +828,6 @@ AutomaticallyTab:CreateToggle({
     Name = "Mutation Plants Only",
     CurrentValue = false,
     Flag = "MutationOnly",
-
     Callback = function(Value)
         MutationOnly = Value
     end
@@ -1169,59 +839,31 @@ AutomaticallyTab:CreateInput({
     Name = "Search Mutation",
     PlaceholderText = "Example: Golden",
     RemoveTextAfterFocusLost = false,
-
     Callback = function(Text)
-        if Text == "" then
-            return
-        end
-
+        if Text == "" then return end
         local Search = Text:lower()
         local Found = {}
 
         for _, Mutation in ipairs(ALL_MUTATIONS) do
-            if Mutation:lower():find(
-                Search,
-                1,
-                true
-            ) then
-                table.insert(
-                    Found,
-                    Mutation
-                )
+            if Mutation:lower():find(Search, 1, true) then
+                table.insert(Found, Mutation)
             end
         end
 
         if #Found == 0 then
-            Rayfield:Notify({
-                Title = "Mutation Search",
-                Content = "No mutation found.",
-                Duration = 2
-            })
-
+            Rayfield:Notify({ Title = "Mutation Search", Content = "No mutation found.", Duration = 2 })
             return
         end
 
         for _, Mutation in ipairs(Found) do
-            addSelection(
-                SelectedMutations,
-                Mutation
-            )
+            addSelection(SelectedMutations, Mutation)
         end
 
         if MutationDropdown then
-            MutationDropdown:Set(
-                SelectedMutations
-            )
+            MutationDropdown:Set(SelectedMutations)
         end
 
-        Rayfield:Notify({
-            Title = "Mutation Added",
-            Content = table.concat(
-                Found,
-                ", "
-            ),
-            Duration = 2
-        })
+        Rayfield:Notify({ Title = "Mutation Added", Content = table.concat(Found, ", "), Duration = 2 })
     end
 })
 
@@ -1231,16 +873,10 @@ MutationDropdown = AutomaticallyTab:CreateDropdown({
     CurrentOption = {},
     MultipleOptions = true,
     Flag = "SelectedMutations",
-
     Callback = function(Options)
-        SelectedMutations =
-            convertSelection(Options)
+        SelectedMutations = convertSelection(Options)
     end
 })
-
---============================================================
--- PLANT FILTER
---============================================================
 
 AutomaticallyTab:CreateSection("Plant Filter")
 
@@ -1250,59 +886,31 @@ AutomaticallyTab:CreateInput({
     Name = "Search Plant",
     PlaceholderText = "Example: Apple",
     RemoveTextAfterFocusLost = false,
-
     Callback = function(Text)
-        if Text == "" then
-            return
-        end
-
+        if Text == "" then return end
         local Search = Text:lower()
         local Found = {}
 
         for _, Plant in ipairs(ALL_PLANTS) do
-            if Plant:lower():find(
-                Search,
-                1,
-                true
-            ) then
-                table.insert(
-                    Found,
-                    Plant
-                )
+            if Plant:lower():find(Search, 1, true) then
+                table.insert(Found, Plant)
             end
         end
 
         if #Found == 0 then
-            Rayfield:Notify({
-                Title = "Plant Search",
-                Content = "No plant found.",
-                Duration = 2
-            })
-
+            Rayfield:Notify({ Title = "Plant Search", Content = "No plant found.", Duration = 2 })
             return
         end
 
         for _, Plant in ipairs(Found) do
-            addSelection(
-                SelectedPlants,
-                Plant
-            )
+            addSelection(SelectedPlants, Plant)
         end
 
         if PlantDropdown then
-            PlantDropdown:Set(
-                SelectedPlants
-            )
+            PlantDropdown:Set(SelectedPlants)
         end
 
-        Rayfield:Notify({
-            Title = "Plant Added",
-            Content = table.concat(
-                Found,
-                ", "
-            ),
-            Duration = 2
-        })
+        Rayfield:Notify({ Title = "Plant Added", Content = table.concat(Found, ", "), Duration = 2 })
     end
 })
 
@@ -1312,83 +920,40 @@ PlantDropdown = AutomaticallyTab:CreateDropdown({
     CurrentOption = {},
     MultipleOptions = true,
     Flag = "SelectedPlants",
-
     Callback = function(Options)
-        SelectedPlants =
-            convertSelection(Options)
+        SelectedPlants = convertSelection(Options)
     end
 })
-
---============================================================
--- SELECTED PLANTS
---============================================================
 
 AutomaticallyTab:CreateToggle({
     Name = "Auto Collect Selected Plants",
     CurrentValue = false,
     Flag = "AutoCollectSelected",
-
     Callback = function(Value)
         if Value then
             if #SelectedPlants == 0 then
-                Rayfield:Notify({
-                    Title = "No Plants Selected",
-                    Content = "Select at least one plant.",
-                    Duration = 3
-                })
-
+                Rayfield:Notify({ Title = "No Plants Selected", Content = "Select at least one plant.", Duration = 3 })
                 return
             end
-
             setAutoCollect(true, false)
-
-            Rayfield:Notify({
-                Title = "Auto Collect",
-                Content = "Collecting selected plants.",
-                Duration = 3
-            })
+            Rayfield:Notify({ Title = "Auto Collect", Content = "Collecting selected plants.", Duration = 3 })
         else
             stopAutoCollect()
-
-            Rayfield:Notify({
-                Title = "Auto Collect",
-                Content = "Stopped.",
-                Duration = 2
-            })
+            Rayfield:Notify({ Title = "Auto Collect", Content = "Stopped.", Duration = 2 })
         end
     end
 })
-
---============================================================
--- CLEAR FILTERS
---============================================================
 
 AutomaticallyTab:CreateButton({
     Name = "Clear All Selections",
-
     Callback = function()
         SelectedPlants = {}
         SelectedMutations = {}
-
-        if PlantDropdown then
-            PlantDropdown:Set({})
-        end
-
-        if MutationDropdown then
-            MutationDropdown:Set({})
-        end
-
-        Rayfield:Notify({
-            Title = "Filters",
-            Content = "Selections cleared.",
-            Duration = 2
-        })
+        if PlantDropdown then PlantDropdown:Set({}) end
+        if MutationDropdown then MutationDropdown:Set({}) end
+        Rayfield:Notify({ Title = "Filters", Content = "Selections cleared.", Duration = 2 })
     end
 })
-
---============================================================
--- SETTINGS
---============================================================
 
 AutomaticallyTab:CreateSection("Settings")
 
@@ -1399,7 +964,6 @@ AutomaticallyTab:CreateSlider({
     Suffix = " studs",
     CurrentValue = 100,
     Flag = "CollectionRadius",
-
     Callback = function(Value)
         CollectionRadius = Value
     end
@@ -1412,14 +976,33 @@ AutomaticallyTab:CreateSlider({
     Suffix = " sec",
     CurrentValue = 0.1,
     Flag = "CollectCooldown",
-
     Callback = function(Value)
         CollectCooldown = Value
     end
 })
 
 --============================================================
--- CHARACTER RESPAWN SUPPORT
+-- THEMES TAB
+--============================================================
+
+ThemeTab:CreateSection("Themes")
+
+local themes = {
+    "Default", "AmberGlow", "Amethyst", "Bloom", 
+    "DarkBlue", "Green", "Light", "Ocean", "Serenity"
+}
+
+for _, themeName in ipairs(themes) do
+    ThemeTab:CreateButton({
+        Name = themeName,
+        Callback = function()
+            Window.ModifyTheme(themeName)
+        end,
+    })
+end
+
+--============================================================
+-- CHARACTER RESPAWN & LOAD CONFIRMATION
 --============================================================
 
 Player.CharacterAdded:Connect(function(Character)
@@ -1427,78 +1010,4 @@ Player.CharacterAdded:Connect(function(Character)
     Character:WaitForChild("HumanoidRootPart", 10)
 end)
 
---============================================================
--- END
---============================================================
-
 print("[Dark Hub] Loaded successfully.")
-
---//==================================================
---// THEMES TAB
---//==================================================
-
-ThemeTab:CreateSection("Themes")
-
-local Button = ThemeTab:CreateButton({
-   Name = "Default",
-   Callback = function()
-   Window.ModifyTheme('Default')
-   end,
-})
-
-local Button = ThemeTab:CreateButton({
-   Name = "AmberGlow",
-   Callback = function()
-   Window.ModifyTheme('AmberGlow')
-   end,
-})
-
-local Button = ThemeTab:CreateButton({
-   Name = "Amethyst",
-   Callback = function()
-   Window.ModifyTheme('Amethyst')
-   end,
-})
-
-local Button = ThemeTab:CreateButton({
-   Name = "Bloom",
-   Callback = function()
-   Window.ModifyTheme('Bloom')
-   end,
-})
-
-local Button = ThemeTab:CreateButton({
-   Name = "DarkBlue",
-   Callback = function()
-   Window.ModifyTheme('DarkBlue')
-   end,
-})
-
-local Button = ThemeTab:CreateButton({
-   Name = "Green",
-   Callback = function()
-   Window.ModifyTheme('Green')
-   end,
-})
-
-local Button = ThemeTab:CreateButton({
-   Name = "Light",
-   Callback = function()
-   Window.ModifyTheme('Light')
-   end,
-})
-
-local Button = ThemeTab:CreateButton({
-   Name = "Ocean",
-   Callback = function()
-   Window.ModifyTheme('Ocean')
-   end,
-})
-
-local Button = ThemeTab:CreateButton({
-   Name = "Serenity",
-   Callback = function()
-   Window.ModifyTheme('Serenity')
-   end,
-})
-
