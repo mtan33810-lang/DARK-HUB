@@ -1,133 +1,168 @@
-local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+--============================================================
+-- DARK HUB
+-- Clean Rayfield LocalScript
+-- Intended for your own Roblox Studio game
+--============================================================
+
+--============================================================
+-- RAYFIELD
+--============================================================
+
+local Rayfield = loadstring(game:HttpGet(
+    "https://sirius.menu/rayfield"
+))()
 
 local Window = Rayfield:CreateWindow({
-   Name = "Dark Hub",
-   Icon = 0,
-   LoadingTitle = "Dark Hub",
-   LoadingSubtitle = "by Max",
-   ShowText = "Rayfield",
-   Theme = "Default",
-   ToggleUIKeybind = Enum.KeyCode.K,
-   DisableRayfieldPrompts = false,
-   DisableBuildWarnings = false,
-   ConfigurationSaving = {
-      Enabled = false,
-      FolderName = nil,
-      FileName = "Big Hub"
-   },
-   Discord = {
-      Enabled = false,
-      Invite = "noinvitelink",
-      RememberJoins = true
-   },
-   KeySystem = false
+    Name = "Dark Hub",
+    Icon = 0,
+    LoadingTitle = "Dark Hub",
+    LoadingSubtitle = "by Max",
+    ShowText = "Rayfield",
+    Theme = "Default",
+
+    ToggleUIKeybind = "K",
+
+    DisableRayfieldPrompts = false,
+    DisableBuildWarnings = false,
+
+    ConfigurationSaving = {
+        Enabled = false,
+        FolderName = nil,
+        FileName = "DarkHub"
+    },
+
+    Discord = {
+        Enabled = false,
+        Invite = "noinvitelink",
+        RememberJoins = true
+    },
+
+    KeySystem = false
 })
 
---// Services
+--============================================================
+-- SERVICES
+--============================================================
+
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 
---// Player
-local player = Players.LocalPlayer
+local Player = Players.LocalPlayer
 
---// State Variables
-local InfiniteJump = false
-local currentWalkSpeed = 16
-local currentJumpHeight = 7.2
+--============================================================
+-- TABS
+--============================================================
 
---//==================================================
---// TABS
---//==================================================
-
-local MainTab = Window:CreateTab("Home", 4483362458)
-local EventsTab = Window:CreateTab("Event", 4483362458)
+local HomeTab = Window:CreateTab("Home", 4483362458)
+local EventTab = Window:CreateTab("Event", 4483362458)
 local ShopTab = Window:CreateTab("Shop", 4483362458)
 local AutomaticallyTab = Window:CreateTab("Automatically", 4483362458)
-local ThemeTab = Window:CreateTab("Themes", 4483362458)
+
+--============================================================
+-- NOTIFICATION
+--============================================================
 
 Rayfield:Notify({
-   Title = "You executed the script",
-   Content = "Very good GUI",
-   Duration = 5,
+    Title = "Dark Hub",
+    Content = "GUI loaded successfully.",
+    Duration = 4
 })
 
---// Helper function to apply character stats
-local function applyStats(character)
-    if not character then return end
-    local humanoid = character:WaitForChild("Humanoid", 5)
-    if humanoid then
-        humanoid.WalkSpeed = currentWalkSpeed
-        humanoid.UseJumpPower = false
-        humanoid.JumpHeight = currentJumpHeight
-    end
+--============================================================
+-- CHARACTER HELPERS
+--============================================================
+
+local function getCharacter()
+    return Player.Character
 end
 
---// Respawn Handler
-player.CharacterAdded:Connect(function(character)
-    applyStats(character)
-end)
+local function getHumanoid()
+    local Character = getCharacter()
 
---//==================================================
---// HOME TAB
---//==================================================
+    if not Character then
+        return nil
+    end
 
-MainTab:CreateSection("Main Controls")
+    return Character:FindFirstChildOfClass("Humanoid")
+end
 
-MainTab:CreateToggle({
+local function getRootPart()
+    local Character = getCharacter()
+
+    if not Character then
+        return nil
+    end
+
+    return Character:FindFirstChild("HumanoidRootPart")
+end
+
+--============================================================
+-- HOME
+--============================================================
+
+HomeTab:CreateSection("Movement")
+
+local InfiniteJump = false
+
+HomeTab:CreateToggle({
     Name = "Infinite Jump",
     CurrentValue = false,
     Flag = "InfiniteJump",
+
     Callback = function(Value)
         InfiniteJump = Value
-    end,
+    end
 })
 
 UserInputService.JumpRequest:Connect(function()
-    if not InfiniteJump then return end
-    local character = player.Character
-    if not character then return end
-    local humanoid = character:FindFirstChildOfClass("Humanoid")
-    if humanoid then
-        humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+    if not InfiniteJump then
+        return
+    end
+
+    local Humanoid = getHumanoid()
+
+    if Humanoid then
+        Humanoid:ChangeState(
+            Enum.HumanoidStateType.Jumping
+        )
     end
 end)
 
-MainTab:CreateSlider({
-    Name = "Walkspeed",
+HomeTab:CreateSlider({
+    Name = "WalkSpeed",
     Range = {0, 300},
     Increment = 1,
     Suffix = " Speed",
     CurrentValue = 16,
     Flag = "WalkSpeed",
+
     Callback = function(Value)
-        currentWalkSpeed = Value
-        local character = player.Character
-        local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-        if humanoid then
-            humanoid.WalkSpeed = Value
+        local Humanoid = getHumanoid()
+
+        if Humanoid then
+            Humanoid.WalkSpeed = Value
         end
-    end,
+    end
 })
 
-MainTab:CreateSlider({
+HomeTab:CreateSlider({
     Name = "Jump Height",
     Range = {0, 300},
     Increment = 1,
     Suffix = " Height",
     CurrentValue = 7.2,
     Flag = "JumpHeight",
+
     Callback = function(Value)
-        currentJumpHeight = Value
-        local character = player.Character
-        local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-        if humanoid then
-            humanoid.UseJumpPower = false
-            humanoid.JumpHeight = Value
+        local Humanoid = getHumanoid()
+
+        if Humanoid then
+            Humanoid.UseJumpPower = false
+            Humanoid.JumpHeight = Value
         end
-    end,
+    end
 })
 
 --//==================================================
