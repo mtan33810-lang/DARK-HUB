@@ -296,78 +296,69 @@ submitToggle = EventsTab:CreateToggle({
 
 EventsTab:CreateSection("Event Shop")
 
-local selectedPlant = "Honey Carrot" -- default selection
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
--- Create plant selection dropdown with your list of plants
-local PlantDropdown = EventsTab:CreateDropdown({
-    Name = "Select Plant",
-    Options = {
-        "Honey Carrot", "Honey Strawberry", "Honey Blueberry", "Honey Buttercup",
-        "Honey Orange Tulip", "Honey Corn", "Honey Daffodil", "Honey Tomato",
-        "Honey Apple", "Honey Bamboo", "Honey Pumpkin", "Honey Watermelon",
-        "Honey Cactus", "Honey Coconut", "Honey Dragon Fruit", "Honey Mango",
-        "Honey Cacao", "Honey Grape", "Honey Mushroom", "Honey Pepper",
-        "Honey Sunflower", "Honey Beanstalk", "Honey Burning Bud", "Honey Giant Pinecone",
-        "Honey Ember Lily", "Honey Sugar Apple", "Honey Alien Apple", "Honey Crimson Thorn",
-        "Honey Elder Strawberry", "Honey Moongrain Meadow", "Honey Octobloom",
-        "Honey Romanesco", "Honey Zebrazinkle"
-    },
-    CurrentOption = {"Honey Carrot"},
+local seedOptions = {
+    "Honey Carrot", "Honey Strawberry", "Honey Blueberry", "Honey Buttercup",
+    "Honey Orange Tulip", "Honey Corn", "Honey Daffodil", "Honey Tomato",
+    "Honey Apple", "Honey Bamboo", "Honey Pumpkin", "Honey Watermelon",
+    "Honey Cactus", "Honey Coconut", "Honey Dragon Fruit", "Honey Mango",
+    "Honey Cacao", "Honey Grape", "Honey Mushroom", "Honey Pepper",
+    "Honey Sunflower", "Honey Beanstalk", "Honey Burning Bud", "Honey Giant Pinecone",
+    "Honey Ember Lily", "Honey Sugar Apple", "Honey Alien Apple", "Honey Crimson Thorn",
+    "Honey Elder Strawberry", "Honey Moongrain Meadow", "Honey Octobloom",
+    "Honey Romanesco", "Honey Zebrazinkle"
+}
+
+local selectedSeeds = {}
+local autoBuySeeds = false
+local buyDelay = 1
+
+EventsTab:CreateDropdown({
+    Name = "Select Seeds to Auto Buy",
+    Options = seedOptions,
+    CurrentOption = {},
     MultipleOptions = true,
-    Flag = "PlantSelection",
+    Flag = "SeedMultiDropdownFlag",
     Callback = function(Options)
-        selectedPlant = Options[1]
-        Rayfield:Notify({
-            Title = "Plant Selected",
-            Content = "You selected: " .. selectedPlant,
-            Duration = 3,
-            Image = nil,
-        })
+        selectedSeeds = typeof(Options) == "table" and Options or {Options}
     end,
 })
 
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-
-local autoBuy = false
-local buyDelay = 1 -- seconds between purchases
-
 EventsTab:CreateToggle({
-    Name = "Auto Buy Selected Plant",
+    Name = "Auto Buy Seeds",
     CurrentValue = false,
-    Flag = "Buy Plants",
-
+    Flag = "AutoBuySeedsFlag",
     Callback = function(Value)
-        autoBuy = Value
+        autoBuySeeds = Value
 
         if Value then
             Rayfield:Notify({
-                Title = "Auto Buy",
-                Content = "Started: " .. tostring(selectedPlant),
+                Title = "Auto Buy Seeds",
+                Content = "Started auto-buying seeds.",
                 Duration = 3,
             })
 
             task.spawn(function()
-                while autoBuy do
-                    if selectedPlant and selectedPlant ~= "" then
+                while autoBuySeeds do
+                    if selectedSeeds and #selectedSeeds > 0 then
                         local gameEvents = ReplicatedStorage:FindFirstChild("GameEvents")
                         local buyEvent = gameEvents and gameEvents:FindFirstChild("BuyEventShopStock")
 
-                        if buyEvent then
-                            buyEvent:FireServer(
-                                selectedPlant,
-                                "Honey Seed Shop"
-                            )
+                        if buyEvent and buyEvent:IsA("RemoteEvent") then
+                            for _, seed in ipairs(selectedSeeds) do
+                                if not autoBuySeeds then break end
+                                buyEvent:FireServer(seed, "Honey Seed Shop")
+                            end
                         end
                     end
-
                     task.wait(buyDelay)
                 end
             end)
-
         else
             Rayfield:Notify({
-                Title = "Auto Buy",
-                Content = "Stopped.",
+                Title = "Auto Buy Seeds",
+                Content = "Stopped auto-buying.",
                 Duration = 3,
             })
         end
