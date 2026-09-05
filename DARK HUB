@@ -465,6 +465,85 @@ EventsTab:CreateToggle({
     end,
 })
 
+EventsTab:CreateSection("Bee Egg Shop")
+
+local eggOptions = {
+    "Common Bee Egg",
+    "Rare Bee Egg",
+    "Mythical Bee Egg",
+    "Transcendent Bee Egg"
+}
+
+local selectedEggs = {}
+local autoBuyEggs = false
+local eggBuyDelay = 1
+
+EventsTab:CreateDropdown({
+    Name = "Select Eggs to Auto Buy",
+    Options = eggOptions,
+    CurrentOption = {},
+    MultipleOptions = true,
+    Flag = "BeeEggShopMultiDropdownFlag",
+    Callback = function(Options)
+        selectedEggs = {}
+        if typeof(Options) == "table" then
+            for key, value in pairs(Options) do
+                if typeof(value) == "string" then
+                    table.insert(selectedEggs, value)
+                elseif value == true and typeof(key) == "string" then
+                    table.insert(selectedEggs, key)
+                end
+            end
+        elseif typeof(Options) == "string" then
+            table.insert(selectedEggs, Options)
+        end
+    end,
+})
+
+EventsTab:CreateToggle({
+    Name = "Auto Buy Bee Eggs",
+    CurrentValue = false,
+    Flag = "AutoBuyBeeEggsFlag",
+    Callback = function(Value)
+        autoBuyEggs = Value
+
+        if Value then
+            Rayfield:Notify({
+                Title = "Bee Egg Shop",
+                Content = "Started auto-buying eggs.",
+                Duration = 3,
+            })
+
+            task.spawn(function()
+                while autoBuyEggs do
+                    if #selectedEggs > 0 then
+                        local gameEvents = ReplicatedStorage:FindFirstChild("GameEvents")
+                        local eggShopService = gameEvents and gameEvents:FindFirstChild("BeeColonyEggShopService")
+                        local buyEggFunc = eggShopService and eggShopService:FindFirstChild("BuyBeeEggStock")
+
+                        if buyEggFunc and buyEggFunc:IsA("RemoteFunction") then
+                            for _, eggName in ipairs(selectedEggs) do
+                                if not autoBuyEggs then break end
+                                -- Pcall protects the script from stopping if the function yields or errors (e.g. not enough coins)
+                                pcall(function()
+                                    buyEggFunc:InvokeServer(eggName)
+                                end)
+                            end
+                        end
+                    end
+                    task.wait(eggBuyDelay)
+                end
+            end)
+        else
+            Rayfield:Notify({
+                Title = "Bee Egg Shop",
+                Content = "Stopped auto-buying eggs.",
+                Duration = 3,
+            })
+        end
+    end,
+})
+
 --//==================================================
 --// SHOP TAB
 --//==================================================
