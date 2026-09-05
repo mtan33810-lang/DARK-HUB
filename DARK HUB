@@ -387,6 +387,84 @@ EventsTab:CreateToggle({
     end,
 })
 
+EventsTab:CreateSection("Royal Jelly Shop")
+
+local shopOptions = {
+    "Pollen Puffball",
+    "Grape Droplet",
+    "Carpenter Bee",
+    "Pet Shard RoyalJelly",
+    "Royal Jelly Fountain",
+    "King Bee",
+    "Pohutukawa",
+}
+
+local selectedRoyalJellyItems = {}
+local autoBuyRoyalJelly = false
+local royalJellyBuyDelay = 1
+
+EventsTab:CreateDropdown({
+    Name = "Select Royal Jelly Shop Items",
+    Options = shopOptions,
+    CurrentOption = {},
+    MultipleOptions = true,
+    Flag = "RoyalJellyShopMultiDropdownFlag",
+    Callback = function(Options)
+        selectedRoyalJellyItems = {}
+        if typeof(Options) == "table" then
+            for key, value in pairs(Options) do
+                if typeof(value) == "string" then
+                    table.insert(selectedRoyalJellyItems, value)
+                elseif value == true and typeof(key) == "string" then
+                    table.insert(selectedRoyalJellyItems, key)
+                end
+            end
+        elseif typeof(Options) == "string" then
+            table.insert(selectedRoyalJellyItems, Options)
+        end
+    end,
+})
+
+EventsTab:CreateToggle({
+    Name = "Auto Buy Royal Jelly Shop",
+    CurrentValue = false,
+    Flag = "AutoBuyRoyalJellyShopFlag",
+    Callback = function(Value)
+        autoBuyRoyalJelly = Value
+
+        if Value then
+            Rayfield:Notify({
+                Title = "Royal Jelly Shop",
+                Content = "Started auto-buying items.",
+                Duration = 3,
+            })
+
+            task.spawn(function()
+                while autoBuyRoyalJelly do
+                    if #selectedRoyalJellyItems > 0 then
+                        local gameEvents = ReplicatedStorage:FindFirstChild("GameEvents")
+                        local buyEvent = gameEvents and gameEvents:FindFirstChild("BuyEventShopStock")
+
+                        if buyEvent and buyEvent:IsA("RemoteEvent") then
+                            for _, itemName in ipairs(selectedRoyalJellyItems) do
+                                if not autoBuyRoyalJelly then break end
+                                buyEvent:FireServer(itemName, "Royal Jelly Shop")
+                            end
+                        end
+                    end
+                    task.wait(royalJellyBuyDelay)
+                end
+            end)
+        else
+            Rayfield:Notify({
+                Title = "Royal Jelly Shop",
+                Content = "Stopped auto-buying.",
+                Duration = 3,
+            })
+        end
+    end,
+})
+
 --//==================================================
 --// SHOP TAB
 --//==================================================
